@@ -1,0 +1,8 @@
+include(
+	'example-jaxrs-application',
+	'portal-remote-cxf-common',
+	'portal-remote-cxf-jaxrs-common',
+	'portal-remote-dependency-manager-tccl',
+	'portal-remote-rest-extender',
+	'test-cxf'
+)
