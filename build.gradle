@@ -10,6 +10,8 @@ buildscript {
 	}
 }
 
+defaultTasks 'build'
+
 subprojects {
 	buildscript {
 		repositories {
@@ -19,8 +21,13 @@ subprojects {
 		}
 	}
 
-	apply plugin: 'biz.aQute.bnd.builder'
-	sourceCompatibility = 1.7
+	if (file('bnd.bnd').exists()) {
+		apply plugin: 'biz.aQute.bnd.builder'
+		sourceCompatibility = 1.7
+    }
+	else {
+		apply plugin: 'java'
+	}
 
 	repositories {
 		maven {
