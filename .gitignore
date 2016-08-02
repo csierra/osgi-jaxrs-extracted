@@ -1,5 +1,11 @@
-**/build
+.project
+.settings
 *.iml
-.gradle
-test-cxf/bundle
-test-cxf/felix-cache
+*/.classpath
+*/.project
+*/.settings/
+*/bin/
+*/build/
+/.gradle/
+/test-cxf/felix-cache/
+/test-cxf/bundle/
