@@ -16,6 +16,11 @@ package com.liferay.portal.remote.rest.extender.activator;
 
 import javax.ws.rs.ext.RuntimeDelegate;
 
+import com.liferay.portal.remote.dependency.manager.tccl.TCCLDependencyManager;
+import com.liferay.portal.remote.rest.extender.internal.RestExtender;
+import org.apache.felix.dm.Component;
+import org.apache.felix.dm.DependencyActivatorBase;
+import org.apache.felix.dm.DependencyManager;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 
@@ -43,10 +48,26 @@ public class CXFJaxRsBundleActivator implements BundleActivator {
 		finally {
 			thread.setContextClassLoader(contextClassLoader);
 		}
+
+		_manager = new TCCLDependencyManager(bundleContext);
+
+		Component restExtenderComponent =
+			_manager.
+				createFactoryConfigurationAdapterService(
+					"com.liferay.portal.remote.rest.extender.configuration." +
+						"RestExtenderConfiguration",
+					"update", false).
+				setImplementation(RestExtender.class);
+
+		_manager.add(restExtenderComponent);
+
+		restExtenderComponent.start();
 	}
 
 	@Override
-	public void stop(BundleContext bundleContext) throws Exception {
+	public void stop(BundleContext context) throws Exception {
+		_manager.clear();
 	}
 
+	private TCCLDependencyManager _manager;
 }

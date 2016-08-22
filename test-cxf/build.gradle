@@ -39,7 +39,6 @@ dependencies {
 	compile group: 'org.apache.felix', name: 'org.apache.felix.http.servlet-api', transitive: false, version: '1.1.2'
 	compile group: 'org.apache.felix', name: 'org.apache.felix.inventory', transitive: false, version: '1.0.4'
 	compile group: 'org.apache.felix', name: 'org.apache.felix.metatype', transitive: false, version: '1.1.2'
-	compile group: 'org.apache.felix', name: 'org.apache.felix.scr', transitive: false, version: '2.0.2'
 	compile group: 'org.apache.felix', name: 'org.apache.felix.webconsole', transitive: false, version: '4.2.16'
 	compile group: 'org.apache.felix', name: 'org.apache.felix.webconsole.plugins.ds', transitive: false, version: '2.0.2'
     compile group: 'log4j', name: 'log4j', version: '1.2.17'

@@ -27,16 +27,12 @@ import javax.servlet.Servlet;
 import org.apache.cxf.Bus;
 import org.apache.cxf.bus.CXFBusFactory;
 import org.apache.cxf.transport.servlet.CXFNonSpringServlet;
+import org.apache.felix.dm.Component;
 import org.apache.felix.dm.DependencyManager;
 import org.apache.felix.dm.ServiceDependency;
 
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.ConfigurationPolicy;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.http.context.ServletContextHelper;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 
@@ -46,29 +42,31 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Carlos Sierra Andrés
  */
-@Component(
-	configurationPid = "com.liferay.portal.remote.cxf.common.configuration.CXFEndpointPublisherConfiguration",
-	configurationPolicy = ConfigurationPolicy.REQUIRE
-)
 public class CXFEndpointPublisher {
 
-	@Activate
-	protected void activate(
-		BundleContext bundleContext, Map<String, Object> properties) {
+	private Component _serviceRegistratorComponent;
 
-		_dependencyManager = new DependencyManager(bundleContext);
+	protected void update(
+		Component component, Dictionary<String, Object> properties) {
 
-		org.apache.felix.dm.Component component =
-			_dependencyManager.createComponent();
+		_dependencyManager = component.getDependencyManager();
+
+		if (_serviceRegistratorComponent != null) {
+			_serviceRegistratorComponent.stop();
+
+			_dependencyManager.remove(_serviceRegistratorComponent);
+		}
+
+		_serviceRegistratorComponent = _dependencyManager.createComponent();
 
 		CXFEndpointPublisherConfiguration cxfEndpointPublisherConfiguration =
 			Configurable.createConfigurable(
 				CXFEndpointPublisherConfiguration.class, properties);
 
 		ServicesRegistrator servicesRegistrator = new ServicesRegistrator(
-			bundleContext, properties);
+			_dependencyManager.getBundleContext(), (Hashtable)properties);
 
-		component.setImplementation(servicesRegistrator);
+		_serviceRegistratorComponent.setImplementation(servicesRegistrator);
 
 		String[] extensions = cxfEndpointPublisherConfiguration.extensions();
 
@@ -82,25 +80,11 @@ public class CXFEndpointPublisher {
 				serviceDependency.setRequired(true);
 				serviceDependency.setService(Object.class, extension);
 
-				component.add(serviceDependency);
+				_serviceRegistratorComponent.add(serviceDependency);
 			}
 		}
 
-		_dependencyManager.add(component);
-	}
-
-	@Deactivate
-	protected void deactivate() {
-		_dependencyManager.clear();
-	}
-
-	@Modified
-	protected void modified(
-		BundleContext bundleContext, Map<String, Object> properties) {
-
-		deactivate();
-
-		activate(bundleContext, properties);
+		_dependencyManager.add(_serviceRegistratorComponent);
 	}
 
 	private DependencyManager _dependencyManager;

@@ -18,47 +18,45 @@ import aQute.bnd.annotation.metatype.Configurable;
 import com.liferay.portal.remote.dependency.manager.tccl.TCCLDependencyManager;
 import com.liferay.portal.remote.rest.extender.configuration.RestExtenderConfiguration;
 
-import java.util.Map;
+import java.util.Dictionary;
+import java.util.Hashtable;
 
 import javax.ws.rs.core.Application;
 
 import org.apache.cxf.Bus;
+import org.apache.felix.dm.Component;
 import org.apache.felix.dm.ServiceDependency;
 
-import org.osgi.framework.BundleContext;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.ConfigurationPolicy;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 
 /**
  * @author Carlos Sierra Andrés
  */
-@Component(
-	configurationPid = "com.liferay.portal.remote.rest.extender.configuration.RestExtenderConfiguration",
-	configurationPolicy = ConfigurationPolicy.REQUIRE
-)
 public class RestExtender {
 
 	public RestExtenderConfiguration getRestExtenderConfiguration() {
 		return _restExtenderConfiguration;
 	}
 
-	@Activate
-	protected void activate(
-		BundleContext bundleContext, Map<String, Object> properties) {
+	protected void update(
+		Component component, Dictionary<String, Object> properties) {
+
+		_dependencyManager =
+			(TCCLDependencyManager)component.getDependencyManager();
+
+		if (_component != null) {
+			_component.stop();
+
+			_dependencyManager.remove(_component);
+		}
 
 		_restExtenderConfiguration = Configurable.createConfigurable(
 			RestExtenderConfiguration.class, properties);
 
-		_dependencyManager = new TCCLDependencyManager(bundleContext);
-
 		_component = _dependencyManager.createComponent();
 
 		CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
-			new CXFJaxRsServiceRegistrator(properties);
+			new CXFJaxRsServiceRegistrator((Hashtable)properties);
 
 		_component.setImplementation(cxfJaxRsServiceRegistrator);
 
@@ -194,21 +192,7 @@ public class RestExtender {
 		return serviceDependency;
 	}
 
-	@Deactivate
-	protected void deactivate() {
-		_dependencyManager.clear();
-	}
-
-	@Modified
-	protected void modified(
-		BundleContext bundleContext, Map<String, Object> properties) {
-
-		deactivate();
-
-		activate(bundleContext, properties);
-	}
-
-	private org.apache.felix.dm.Component _component;
+	private Component _component;
 	private TCCLDependencyManager _dependencyManager;
 	private RestExtenderConfiguration _restExtenderConfiguration;
 
