@@ -14,31 +14,34 @@
 
 package com.liferay.portal.remote.cxf.common.activator;
 
-import com.liferay.portal.remote.cxf.common.CXFEndpointPublisher;
-import org.apache.felix.dm.Component;
-import org.apache.felix.dm.DependencyActivatorBase;
-import org.apache.felix.dm.DependencyManager;
+import com.liferay.portal.remote.cxf.common.ServicesRegistrator;
+import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+
+import java.util.HashMap;
 
 /**
  * @author Carlos Sierra Andrés
  */
-public class CXFEndpointPublisherActivator extends DependencyActivatorBase {
+public class CXFEndpointPublisherActivator implements BundleActivator {
+
+	private ServicesRegistrator _servicesRegistrator;
 
 	@Override
-	public void init(BundleContext context, DependencyManager manager)
-		throws Exception {
+	public void start(BundleContext bundleContext) throws Exception {
+		HashMap<String, Object> properties = new HashMap<String, Object>() {{
+			put("contextPath", "/cxf");
+		}};
 
-		Component component = manager.
-			createFactoryConfigurationAdapterService(
-				"com.liferay.portal.remote.cxf.common.configuration." +
-					"CXFEndpointPublisherConfiguration",
-				"update", false).
-			setImplementation(CXFEndpointPublisher.class);
+		_servicesRegistrator = new ServicesRegistrator(
+			bundleContext, properties);
 
-		manager.add(component);
-
-		component.start();
+		_servicesRegistrator.start();
 	}
 
+	@Override
+	public void stop(BundleContext context) throws Exception {
+		_servicesRegistrator.stop();
+	}
 }
+

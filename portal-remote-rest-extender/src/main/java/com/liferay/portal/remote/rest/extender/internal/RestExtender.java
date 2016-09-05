@@ -38,36 +38,38 @@ public class RestExtender {
 		return _restExtenderConfiguration;
 	}
 
-	protected void update(
-		Component component, Dictionary<String, Object> properties) {
+	public RestExtender() {
+		System.out.println("Constructor");
+	}
 
+	protected void update(Dictionary<String, Object> properties) {
 		_dependencyManager =
-			(TCCLDependencyManager)component.getDependencyManager();
+			(TCCLDependencyManager)_component.getDependencyManager();
 
-		if (_component != null) {
-			_component.stop();
+		if (_registratorComponent != null) {
+			_registratorComponent.stop();
 
-			_dependencyManager.remove(_component);
+			_dependencyManager.remove(_registratorComponent);
 		}
 
 		_restExtenderConfiguration = Configurable.createConfigurable(
 			RestExtenderConfiguration.class, properties);
 
-		_component = _dependencyManager.createComponent();
+		_registratorComponent = _dependencyManager.createComponent();
 
 		CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
 			new CXFJaxRsServiceRegistrator((Hashtable)properties);
 
-		_component.setImplementation(cxfJaxRsServiceRegistrator);
+		_registratorComponent.setImplementation(cxfJaxRsServiceRegistrator);
 
 		addBusDependencies();
 		addJaxRsApplicationDependencies();
 		addJaxRsProviderServiceDependencies();
 		addJaxRsServiceDependencies();
 
-		_dependencyManager.add(_component);
+		_dependencyManager.add(_registratorComponent);
 
-		_component.start();
+		_registratorComponent.start();
 	}
 
 	protected void addBusDependencies() {
@@ -193,6 +195,7 @@ public class RestExtender {
 	}
 
 	private Component _component;
+	private Component _registratorComponent;
 	private TCCLDependencyManager _dependencyManager;
 	private RestExtenderConfiguration _restExtenderConfiguration;
 

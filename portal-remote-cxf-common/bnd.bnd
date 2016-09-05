@@ -1,3 +1,4 @@
+Bundle-Activator: com.liferay.portal.remote.cxf.common.activator.CXFEndpointPublisherActivator
 Bundle-ClassPath:\
 	.,\
 	lib/cxf-core.jar,\
@@ -7,6 +8,7 @@ Bundle-ClassPath:\
 	lib/cxf-rt-wsdl.jar,\
 	lib/cxf-tools-common.jar,\
 	lib/cxf-tools-validator.jar,\
+	lib/javax.annotation-api.jar,\
 	lib/wsdl4j.jar,\
 	lib/xmlschema-core.jar
 Bundle-Name: Liferay Portal Remote CXF Common
@@ -56,5 +58,6 @@ Liferay-Releng-Module-Group-Title: Remote Service Engines
 	lib/cxf-rt-wsdl.jar=cxf-rt-wsdl-3.0.3.jar,\
 	lib/cxf-tools-common.jar=cxf-tools-common-3.0.3.jar,\
 	lib/cxf-tools-validator.jar=cxf-tools-validator-3.0.3.jar,\
+	lib/javax.annotation-api.jar=javax.annotation-api-1.2.jar,\
 	lib/wsdl4j.jar=wsdl4j-1.6.3.jar,\
 	lib/xmlschema-core.jar=xmlschema-core-2.1.0.jar
