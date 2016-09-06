@@ -26,6 +26,7 @@ import javax.ws.rs.ext.RuntimeDelegate;
 import org.apache.cxf.Bus;
 import org.apache.cxf.endpoint.Server;
 import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
+import org.apache.cxf.jaxrs.lifecycle.SingletonResourceProvider;
 import org.apache.cxf.jaxrs.provider.json.JSONProvider;
 
 /**
@@ -119,7 +120,14 @@ public class CXFJaxRsServiceRegistrator {
 		}
 
 		for (Object service : _services) {
-			jaxRsServerFactoryBean.setServiceBean(service);
+			jaxRsServerFactoryBean.setResourceProvider(
+				new SingletonResourceProvider(service, true));
+		}
+
+		String address = _properties.get("CXF_ENDPOINT_ADDRESS").toString();
+
+		if (address != null) {
+			jaxRsServerFactoryBean.setAddress(address);
 		}
 
 		Server server = jaxRsServerFactoryBean.create();

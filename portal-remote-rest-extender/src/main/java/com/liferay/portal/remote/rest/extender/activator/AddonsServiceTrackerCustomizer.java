@@ -24,7 +24,7 @@ import javax.ws.rs.ext.Provider;
 /**
  * @author Carlos Sierra Andrés
  */
-public class SingletonsServiceTrackerCustomizer
+public class AddonsServiceTrackerCustomizer
 	implements ServiceTrackerCustomizer<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator> {
 
 	private final BundleContext _bundleContext;
@@ -32,7 +32,7 @@ public class SingletonsServiceTrackerCustomizer
 	private final Class<?> _serviceClass;
 	private final Object _service;
 
-	public SingletonsServiceTrackerCustomizer(
+	public AddonsServiceTrackerCustomizer(
 		BundleContext bundleContext, ClassLoader classLoader,
 		Object service) {
 

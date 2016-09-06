@@ -14,28 +14,21 @@
 
 package com.liferay.portal.remote.rest.extender.activator;
 
-import javax.ws.rs.core.Application;
 import javax.ws.rs.ext.RuntimeDelegate;
 
-import com.liferay.portal.remote.rest.extender.internal.CXFJaxRsServiceRegistrator;
 import org.apache.cxf.Bus;
-import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Filter;
-import org.osgi.framework.InvalidSyntaxException;
-import org.osgi.framework.ServiceReference;
-import org.osgi.framework.wiring.BundleWiring;
 import org.osgi.util.tracker.ServiceTracker;
-import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
 /**
  * @author Carlos Sierra Andrés
  */
 public class CXFJaxRsBundleActivator implements BundleActivator {
 
-	private ServiceTracker<Object, ServiceTracker<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>> _singletonsTracker;
-	private ServiceTracker<Bus, ServiceTracker<Application, ApplicationServiceTrackerCustomizer.Tracked>> _busServiceTracker;
+	private ServiceTracker<?, ?> _singletonsTracker;
+	private ServiceTracker<?, ?> _busServiceTracker;
 
 	@Override
 	public void start(BundleContext bundleContext) throws Exception {
@@ -80,80 +73,4 @@ public class CXFJaxRsBundleActivator implements BundleActivator {
 		_busServiceTracker.close();
 	}
 
-	private static class ServicesServiceTrackerCustomizer
-		implements ServiceTrackerCustomizer
-			<Object, ServiceTracker
-				<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>> {
-
-		private final BundleContext _bundleContext;
-
-		public ServicesServiceTrackerCustomizer(BundleContext bundleContext) {
-			_bundleContext = bundleContext;
-		}
-
-		@Override
-		public ServiceTracker
-			<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>
-				addingService(ServiceReference<Object> reference) {
-
-			String applicationSelector =
-				reference.getProperty("jaxrs.application.select").toString();
-
-			Bundle bundle = reference.getBundle();
-
-			BundleWiring bundleWiring = bundle.adapt(BundleWiring.class);
-
-			ClassLoader classLoader = bundleWiring.getClassLoader();
-
-			Object service = _bundleContext.getService(reference);
-
-			try {
-				Filter filter = _bundleContext.createFilter(
-					"(&(objectClass=" + CXFJaxRsServiceRegistrator.class.getName() + ")" +
-						applicationSelector + ")");
-
-				ServiceTracker
-					<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>
-						serviceTracker = new ServiceTracker<>(
-							_bundleContext, filter,
-							new SingletonsServiceTrackerCustomizer(
-								_bundleContext, classLoader,
-								service));
-
-				serviceTracker.open();
-
-				return serviceTracker;
-			}
-			catch (InvalidSyntaxException ise) {
-				_bundleContext.ungetService(reference);
-
-				throw new RuntimeException(ise);
-			}
-		}
-
-		@Override
-		public void modifiedService(
-			ServiceReference<Object> reference,
-			ServiceTracker
-				<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>
-					serviceTracker) {
-
-			removedService(reference, serviceTracker);
-
-			addingService(reference);
-		}
-
-		@Override
-		public void removedService(
-			ServiceReference<Object> reference,
-			ServiceTracker
-				<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>
-				serviceTracker) {
-
-			serviceTracker.close();
-
-			_bundleContext.ungetService(reference);
-		}
-
-	}
 }

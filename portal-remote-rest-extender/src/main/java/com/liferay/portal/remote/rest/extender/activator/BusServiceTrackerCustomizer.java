@@ -16,46 +16,52 @@ package com.liferay.portal.remote.rest.extender.activator;
 
 import org.apache.cxf.Bus;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.Filter;
+import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceReference;
 import org.osgi.util.tracker.ServiceTracker;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
 import javax.ws.rs.core.Application;
+import java.util.Arrays;
+import java.util.Collection;
 
 /**
  * @author Carlos Sierra Andrés
  */
 public class BusServiceTrackerCustomizer
-	implements ServiceTrackerCustomizer<Bus, ServiceTracker<Application,
-		ApplicationServiceTrackerCustomizer.Tracked>> {
+	implements ServiceTrackerCustomizer<Bus, Collection<ServiceTracker<?, ?>>> {
 
 	private BundleContext _bundleContext;
 
-	public BusServiceTrackerCustomizer(
-		BundleContext bundleContext) {
-
+	public BusServiceTrackerCustomizer(BundleContext bundleContext) {
 		_bundleContext = bundleContext;
 	}
 
 	@Override
-	public ServiceTracker
-		<Application, ApplicationServiceTrackerCustomizer.Tracked>
+	public Collection<ServiceTracker<?, ?>>
 	addingService(ServiceReference<Bus> serviceReference) {
 
 		Bus bus = _bundleContext.getService(serviceReference);
 
 		try {
-			ServiceTracker
-				<Application,
-					ApplicationServiceTrackerCustomizer.Tracked>
-				applicationTracker =
-				new ServiceTracker<>(_bundleContext, Application.class,
+			ServiceTracker<Application,?> applicationTracker =
+				new ServiceTracker<>(_bundleContext, getApplicationFilter(),
 					new ApplicationServiceTrackerCustomizer(
 						_bundleContext, bus));
 
 			applicationTracker.open();
 
-			return applicationTracker;
+			ServiceTracker<Object, ?> singletonsServiceTracker =
+				new ServiceTracker<>(_bundleContext, getSingletonsFilter(),
+					new SingletonServiceTrackerCustomizer(_bundleContext, bus));
+
+			singletonsServiceTracker.open();
+
+			return Arrays.asList(applicationTracker, singletonsServiceTracker);
+		}
+		catch (InvalidSyntaxException ise) {
+			throw new RuntimeException(ise);
 		}
 		catch (Exception e) {
 			_bundleContext.ungetService(serviceReference);
@@ -64,14 +70,22 @@ public class BusServiceTrackerCustomizer
 		}
 	}
 
+	private Filter getApplicationFilter() throws InvalidSyntaxException {
+		return _bundleContext.createFilter(
+			"(&(objectClass=" + Application.class.getName() + ")" +
+				"(osgi.jaxrs.application.base=*))");
+	}
+
+	private Filter getSingletonsFilter() throws InvalidSyntaxException {
+		return _bundleContext.createFilter("(osgi.jaxrs.resource.base=*)");
+	}
+
 	@Override
 	public void modifiedService(
 		ServiceReference<Bus> reference,
-		ServiceTracker
-			<Application, ApplicationServiceTrackerCustomizer.Tracked>
-			service) {
+		Collection<ServiceTracker<?, ?>> serviceTrackers) {
 
-		removedService(reference, service);
+		removedService(reference, serviceTrackers);
 
 		addingService(reference);
 	}
@@ -79,12 +93,13 @@ public class BusServiceTrackerCustomizer
 	@Override
 	public void removedService(
 		ServiceReference<Bus> serviceReference,
-		ServiceTracker
-			<Application, ApplicationServiceTrackerCustomizer.Tracked>
-			serviceTracker) {
+		Collection<ServiceTracker<?, ?>> serviceTrackers) {
 
 		_bundleContext.ungetService(serviceReference);
 
-		serviceTracker.close();
+		for (ServiceTracker<?, ?> serviceTracker : serviceTrackers) {
+			serviceTracker.close();
+		}
 	}
+
 }

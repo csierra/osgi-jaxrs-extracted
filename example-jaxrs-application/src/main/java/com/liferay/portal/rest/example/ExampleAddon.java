@@ -16,16 +16,19 @@ package com.liferay.portal.rest.example;
 
 import org.osgi.service.component.annotations.Component;
 
+import javax.annotation.PostConstruct;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.UriInfo;
 
 /**
  * @author Carlos Sierra Andrés
  */
 @Component(
 	immediate = true,
-	property = "jaxrs.application.select=(component.name=com.liferay.portal.rest.example.ExampleApplication)",
+	property = "osgi.jaxrs.resource.base=/example-addon",
 	service = ExampleAddon.class
 )
 public class ExampleAddon {
@@ -35,5 +38,13 @@ public class ExampleAddon {
 	public String sayHello(@PathParam("name") String name) {
 		return "Hello " + name;
 	}
+
+	@PostConstruct
+	public void init() {
+		System.out.println("URIINFO: " + _uriInfo);
+	}
+
+	@Context
+	UriInfo _uriInfo;
 
 }

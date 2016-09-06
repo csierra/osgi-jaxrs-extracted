@@ -26,8 +26,11 @@ import java.util.Set;
 /**
  * @author Carlos Sierra Andrés
  */
-@Component(immediate = true, service = Application.class)
-@ApplicationPath("/example")
+@Component(
+	immediate = true,
+	property = "osgi.jaxrs.application.base=/example-application",
+	service = Application.class
+)
 public class ExampleApplication extends Application {
 
 	@Override

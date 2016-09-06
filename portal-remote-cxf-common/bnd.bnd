@@ -17,7 +17,7 @@ Bundle-Version: 2.0.6
 Export-Package:\
 	javax.wsdl.*;version="1.2",\
 	\
-	org.apache.cxf.*;version="3.0.3",\
+	org.apache.cxf.*;version="3.1.7",\
 	org.apache.ws.commons.schema.*;version="2.1.0"
 Import-Package:\
 	!com.sun.*,\
@@ -51,13 +51,13 @@ Import-Package:\
 Liferay-Releng-Module-Group-Description:
 Liferay-Releng-Module-Group-Title: Remote Service Engines
 -includeresource:\
-	lib/cxf-core.jar=cxf-core-3.0.3.jar,\
-	lib/cxf-rt-bindings-soap.jar=cxf-rt-bindings-soap-3.0.3.jar,\
-	lib/cxf-rt-databinding-jaxb.jar=cxf-rt-databinding-jaxb-3.0.3.jar,\
-	lib/cxf-rt-transports-http.jar=cxf-rt-transports-http-3.0.3.jar,\
-	lib/cxf-rt-wsdl.jar=cxf-rt-wsdl-3.0.3.jar,\
-	lib/cxf-tools-common.jar=cxf-tools-common-3.0.3.jar,\
-	lib/cxf-tools-validator.jar=cxf-tools-validator-3.0.3.jar,\
+	lib/cxf-core.jar=cxf-core-3.1.7.jar,\
+	lib/cxf-rt-bindings-soap.jar=cxf-rt-bindings-soap-3.1.7.jar,\
+	lib/cxf-rt-databinding-jaxb.jar=cxf-rt-databinding-jaxb-3.1.7.jar,\
+	lib/cxf-rt-transports-http.jar=cxf-rt-transports-http-3.1.7.jar,\
+	lib/cxf-rt-wsdl.jar=cxf-rt-wsdl-3.1.7.jar,\
+	lib/cxf-tools-common.jar=cxf-tools-common-3.1.7.jar,\
+	lib/cxf-tools-validator.jar=cxf-tools-validator-3.1.7.jar,\
 	lib/javax.annotation-api.jar=javax.annotation-api-1.2.jar,\
 	lib/wsdl4j.jar=wsdl4j-1.6.3.jar,\
-	lib/xmlschema-core.jar=xmlschema-core-2.1.0.jar
+	lib/xmlschema-core.jar=xmlschema-core-2.2.1.jar
