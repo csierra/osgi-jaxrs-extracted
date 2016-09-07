@@ -16,8 +16,6 @@ package com.liferay.portal.remote.rest.extender.internal;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Map;
 
 import javax.ws.rs.core.Application;
@@ -34,76 +32,80 @@ import org.apache.cxf.jaxrs.provider.json.JSONProvider;
  */
 public class CXFJaxRsServiceRegistrator {
 
-	public CXFJaxRsServiceRegistrator(Map<String, Object> properties) {
-		_properties = properties;
-	}
+	public CXFJaxRsServiceRegistrator(
+		Bus bus, Application application, Map<String, Object> properties) {
 
-	public synchronized void addApplication(Application application) {
-		_applications.add(application);
+		_bus = bus;
+		_application = application;
+		_properties = properties;
 
 		rewire();
 	}
 
-	public synchronized void addBus(Bus bus) {
-		_buses.add(bus);
-
-		for (Application application : _applications) {
-			registerApplication(bus, application);
+	public void close() {
+		if (_closed) {
+			return;
 		}
+
+		if (_server != null) {
+			_server.destroy();
+		}
+
+		_closed = true;
 	}
 
-	public synchronized void addProvider(Object provider) {
+	public void addProvider(Object provider) {
+		if (_closed) {
+			return;
+		}
+
 		_providers.add(provider);
 
 		rewire();
 	}
 
-	public synchronized void addService(Object service) {
+	public void addService(Object service) {
+		if (_closed) {
+			return;
+		}
+
 		_services.add(service);
 
 		rewire();
 	}
 
-	public synchronized void removeApplication(Application application) {
-		_applications.remove(application);
-
-		remove(application);
-	}
-
-	public synchronized void removeBus(Bus bus) {
-		_buses.remove(bus);
-
-		Map<Object, Server> servers = _busServers.remove(bus);
-
-		if (servers == null) {
+	public void removeProvider(Object provider) {
+		if (_closed) {
 			return;
 		}
 
-		for (Server server : servers.values()) {
-			server.destroy();
-		}
-	}
-
-	public synchronized void removeProvider(Object provider) {
 		_providers.remove(provider);
 
 		rewire();
 	}
 
-	public synchronized void removeService(Object service) {
+	public void removeService(Object service) {
+		if (_closed) {
+			return;
+		}
+
 		_services.remove(service);
 
 		rewire();
 	}
 
-	protected void registerApplication(Bus bus, Application application) {
+	protected synchronized void rewire() {
+		if (_server != null) {
+			_server.destroy();
+		}
+
 		RuntimeDelegate runtimeDelegate = RuntimeDelegate.getInstance();
 
 		JAXRSServerFactoryBean jaxRsServerFactoryBean =
 			runtimeDelegate.createEndpoint(
-				application, JAXRSServerFactoryBean.class);
+				_application, JAXRSServerFactoryBean.class);
 
-		jaxRsServerFactoryBean.setBus(bus);
+		jaxRsServerFactoryBean.setBus(_bus);
 		jaxRsServerFactoryBean.setProperties(_properties);
 
 		JSONProvider<Object> jsonProvider = new JSONProvider<>();
@@ -130,57 +132,17 @@ public class CXFJaxRsServiceRegistrator {
 			jaxRsServerFactoryBean.setAddress(address);
 		}
 
-		Server server = jaxRsServerFactoryBean.create();
+		_server = jaxRsServerFactoryBean.create();
 
-		server.start();
-
-		store(bus, application, server);
+		_server.start();
 	}
 
-	protected void registerApplications() {
-		for (Bus bus : _buses) {
-			for (Application application : _applications) {
-				registerApplication(bus, application);
-			}
-		}
-	}
-
-	protected void remove(Object application) {
-		for (Map<Object, Server> servers : _busServers.values()) {
-			Server server = servers.remove(application);
-
-			if (server != null) {
-				server.destroy();
-			}
-		}
-	}
-
-	protected void rewire() {
-		for (Application application : _applications) {
-			remove(application);
-		}
-
-		registerApplications();
-	}
-
-	protected void store(Bus bus, Object object, Server server) {
-		Map<Object, Server> servers = _busServers.get(bus);
-
-		if (servers == null) {
-			servers = new HashMap<>();
-
-			_busServers.put(bus, servers);
-		}
-
-		servers.put(object, server);
-	}
-
-	private final Collection<Application> _applications = new ArrayList<>();
-	private final Collection<Bus> _buses = new ArrayList<>();
-	private final Map<Bus, Map<Object, Server>> _busServers =
-		new IdentityHashMap<>();
+	private volatile boolean _closed = false;
+	private final Application _application;
+	private final Bus _bus;
 	private final Map<String, Object> _properties;
 	private final Collection<Object> _providers = new ArrayList<>();
+	private Server _server;
 	private final Collection<Object> _services = new ArrayList<>();
 
 }

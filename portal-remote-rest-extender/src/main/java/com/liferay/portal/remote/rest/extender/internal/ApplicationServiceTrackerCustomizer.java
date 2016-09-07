@@ -12,14 +12,12 @@
  * details.
  */
 
-package com.liferay.portal.remote.rest.extender.activator;
+package com.liferay.portal.remote.rest.extender.internal;
 
-import com.liferay.portal.remote.rest.extender.internal.CXFJaxRsServiceRegistrator;
 import org.apache.cxf.Bus;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
-import org.osgi.util.tracker.ServiceTracker;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
 import javax.ws.rs.core.Application;
@@ -68,10 +66,7 @@ class ApplicationServiceTrackerCustomizer
 					toString());
 
 			CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
-				new CXFJaxRsServiceRegistrator(properties);
-
-			cxfJaxRsServiceRegistrator.addBus(_bus);
-			cxfJaxRsServiceRegistrator.addApplication(application);
+				new CXFJaxRsServiceRegistrator(_bus, application, properties);
 
 			return new Tracked(
 				cxfJaxRsServiceRegistrator, application,
@@ -91,6 +86,7 @@ class ApplicationServiceTrackerCustomizer
 		ServiceReference<Application> serviceReference, Tracked tracked) {
 
 		removedService(serviceReference, tracked);
+
 		addingService(serviceReference);
 	}
 
@@ -100,14 +96,7 @@ class ApplicationServiceTrackerCustomizer
 
 		_bundleContext.ungetService(reference);
 
-		Application application = tracked.getApplication();
-
-		CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
-			tracked.getCxfJaxRsServiceRegistrator();
-
-		cxfJaxRsServiceRegistrator.removeApplication(application);
-
-		cxfJaxRsServiceRegistrator.removeBus(_bus);
+		tracked.getCxfJaxRsServiceRegistrator().close();
 
 		tracked.getCxfJaxRsServiceRegistratorServiceRegistration().unregister();
 	}

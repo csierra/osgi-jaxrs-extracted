@@ -12,9 +12,8 @@
  * details.
  */
 
-package com.liferay.portal.remote.rest.extender.activator;
+package com.liferay.portal.remote.rest.extender.internal;
 
-import com.liferay.portal.remote.rest.extender.internal.CXFJaxRsServiceRegistrator;
 import org.apache.cxf.Bus;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
@@ -59,6 +58,9 @@ class SingletonServiceTrackerCustomizer
 				propertyKeys.length);
 
 			for (String propertyKey : propertyKeys) {
+				if (propertyKey.equals("osgi.jaxrs.resource.base")) {
+					continue;
+				}
 				properties.put(
 					propertyKey, serviceReference.getProperty(propertyKey));
 			}
@@ -69,15 +71,15 @@ class SingletonServiceTrackerCustomizer
 					toString());
 
 			CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
-				new CXFJaxRsServiceRegistrator(properties);
-
-			cxfJaxRsServiceRegistrator.addBus(_bus);
-			cxfJaxRsServiceRegistrator.addApplication(new Application() {
-				@Override
-				public Set<Object> getSingletons() {
-					return Collections.singleton(service);
-				}
-			});
+				new CXFJaxRsServiceRegistrator(
+					_bus,
+					new Application() {
+						@Override
+						public Set<Object> getSingletons() {
+							return Collections.singleton(service);
+						}
+					},
+					properties);
 
 			return new Tracked(
 				cxfJaxRsServiceRegistrator, service,
@@ -112,9 +114,7 @@ class SingletonServiceTrackerCustomizer
 		CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
 			tracked.getCxfJaxRsServiceRegistrator();
 
-		cxfJaxRsServiceRegistrator.removeService(service);
-
-		cxfJaxRsServiceRegistrator.removeBus(_bus);
+		cxfJaxRsServiceRegistrator.close();
 
 		tracked.getCxfJaxRsServiceRegistratorServiceRegistration().unregister();
 	}

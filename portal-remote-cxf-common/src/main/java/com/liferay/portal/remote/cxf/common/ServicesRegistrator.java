@@ -155,7 +155,7 @@ public class ServicesRegistrator {
 	}
 
 	private static final Logger _logger = LoggerFactory.getLogger(
-		CXFEndpointPublisher.class);
+		ServicesRegistrator.class);
 
 	private final BundleContext _bundleContext;
 	private ServiceRegistration<Bus> _busServiceRegistration;

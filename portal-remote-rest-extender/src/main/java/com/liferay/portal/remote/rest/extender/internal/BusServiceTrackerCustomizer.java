@@ -12,7 +12,7 @@
  * details.
  */
 
-package com.liferay.portal.remote.rest.extender.activator;
+package com.liferay.portal.remote.rest.extender.internal;
 
 import org.apache.cxf.Bus;
 import org.osgi.framework.BundleContext;

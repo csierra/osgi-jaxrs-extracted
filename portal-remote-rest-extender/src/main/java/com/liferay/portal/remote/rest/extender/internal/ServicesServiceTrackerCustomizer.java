@@ -12,9 +12,8 @@
  * details.
  */
 
-package com.liferay.portal.remote.rest.extender.activator;
+package com.liferay.portal.remote.rest.extender.internal;
 
-import com.liferay.portal.remote.rest.extender.internal.CXFJaxRsServiceRegistrator;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Filter;
@@ -27,7 +26,7 @@ import org.osgi.util.tracker.ServiceTrackerCustomizer;
 /**
  * @author Carlos Sierra Andrés
  */
-class ServicesServiceTrackerCustomizer
+public class ServicesServiceTrackerCustomizer
 	implements ServiceTrackerCustomizer
 		<Object, ServiceTracker
 			<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>> {
@@ -62,10 +61,10 @@ class ServicesServiceTrackerCustomizer
 			ServiceTracker
 				<CXFJaxRsServiceRegistrator, CXFJaxRsServiceRegistrator>
 				serviceTracker = new ServiceTracker<>(
-				_bundleContext, filter,
-				new AddonsServiceTrackerCustomizer(
-					_bundleContext, classLoader,
-					service));
+					_bundleContext, filter,
+					new AddonsServiceTrackerCustomizer(
+						_bundleContext, classLoader,
+						service));
 
 			serviceTracker.open();
 

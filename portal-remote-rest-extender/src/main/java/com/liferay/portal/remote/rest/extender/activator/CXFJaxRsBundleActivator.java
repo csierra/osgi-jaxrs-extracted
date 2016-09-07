@@ -16,6 +16,8 @@ package com.liferay.portal.remote.rest.extender.activator;
 
 import javax.ws.rs.ext.RuntimeDelegate;
 
+import com.liferay.portal.remote.rest.extender.internal.BusServiceTrackerCustomizer;
+import com.liferay.portal.remote.rest.extender.internal.ServicesServiceTrackerCustomizer;
 import org.apache.cxf.Bus;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
@@ -27,8 +29,8 @@ import org.osgi.util.tracker.ServiceTracker;
  */
 public class CXFJaxRsBundleActivator implements BundleActivator {
 
-	private ServiceTracker<?, ?> _singletonsTracker;
 	private ServiceTracker<?, ?> _busServiceTracker;
+	private ServiceTracker<?, ?> _singletonsTracker;
 
 	@Override
 	public void start(BundleContext bundleContext) throws Exception {
@@ -68,9 +70,9 @@ public class CXFJaxRsBundleActivator implements BundleActivator {
 
 	@Override
 	public void stop(BundleContext context) throws Exception {
-		_singletonsTracker.close();
-
 		_busServiceTracker.close();
+
+		_singletonsTracker.close();
 	}
 
 }

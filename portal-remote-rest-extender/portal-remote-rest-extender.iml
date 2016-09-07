@@ -17,7 +17,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Gradle: biz.aQute.bnd:biz.aQute.bndlib:3.1.0" level="project" />
     <orderEntry type="library" name="Gradle: com.liferay:com.liferay.portal.remote.cxf.jaxrs.common:2.0.0" level="project" />
-    <orderEntry type="library" name="Gradle: com.liferay:com.liferay.portal.remote.dependency.manager.tccl:2.0.0" level="project" />
     <orderEntry type="library" name="Gradle: javax.ws.rs:javax.ws.rs-api:2.0.1" level="project" />
     <orderEntry type="library" name="Gradle: org.apache.cxf:cxf-core:3.1.7" level="project" />
     <orderEntry type="library" name="Gradle: org.apache.cxf:cxf-rt-frontend-jaxrs:3.1.7" level="project" />
