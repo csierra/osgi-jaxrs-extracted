@@ -28,7 +28,7 @@ import javax.ws.rs.core.UriInfo;
  */
 @Component(
 	immediate = true,
-	property = "osgi.jaxrs.resource.base=/example-addon",
+	property = "osgi.jaxrs.resource.base=/examples/example-addon",
 	service = ExampleAddon.class
 )
 public class ExampleAddon {

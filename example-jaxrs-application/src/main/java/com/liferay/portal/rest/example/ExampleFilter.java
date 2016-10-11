@@ -26,7 +26,10 @@ import java.io.IOException;
  */
 @Component(
 	immediate = true,
-	property = "jaxrs.application.select=(component.name=com.liferay.portal.rest.example.ExampleApplication)"
+	property = {
+		"jaxrs.application.select=(component.name=com.liferay.portal.rest.example.ExampleApplication)",
+		"osgi.jaxrs.filter.base=/examples"
+	}
 )
 @Provider
 public class ExampleFilter implements ContainerRequestFilter {
