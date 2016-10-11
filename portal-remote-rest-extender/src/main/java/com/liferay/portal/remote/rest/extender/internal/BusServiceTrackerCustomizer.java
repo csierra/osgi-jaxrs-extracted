@@ -58,6 +58,13 @@ public class BusServiceTrackerCustomizer
 
 			singletonsServiceTracker.open();
 
+			ServiceTracker<Object, ?> filtersAndInterceptorsServiceTracker =
+				new ServiceTracker<>(_bundleContext, getFiltersFilter(),
+					new FiltersAndInterceptorsServiceTrackerCustomizer(
+						_bundleContext));
+
+			filtersAndInterceptorsServiceTracker.open();
+
 			return Arrays.asList(applicationTracker, singletonsServiceTracker);
 		}
 		catch (InvalidSyntaxException ise) {
@@ -68,6 +75,10 @@ public class BusServiceTrackerCustomizer
 
 			throw e;
 		}
+	}
+
+	private Filter getFiltersFilter() throws InvalidSyntaxException {
+		return _bundleContext.createFilter("(osgi.jaxrs.filter.base=*)");
 	}
 
 	private Filter getApplicationFilter() throws InvalidSyntaxException {
