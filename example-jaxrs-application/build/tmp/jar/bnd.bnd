@@ -1,4 +1,0 @@
-#Wed Sep 07 14:15:05 CEST 2016
-Bundle-SymbolicName=com.liferay.portal.rest.example
-Bundle-Version=1.0.0
-Bundle-Name=Example OSGi Rest Application

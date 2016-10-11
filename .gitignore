@@ -5,7 +5,7 @@
 */.project
 */.settings/
 */bin/
-*/build/
+**/build/
 /.gradle/
 /test-cxf/felix-cache/
 /test-cxf/bundle/
