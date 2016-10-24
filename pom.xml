@@ -36,7 +36,7 @@
             <plugin>
                 <groupId>biz.aQute.bnd</groupId>
                 <artifactId>bnd-maven-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.4.0-SNAPSHOT</version>
                 <executions>
                     <execution>
                         <goals>
@@ -47,6 +47,11 @@
             </plugin>
         </plugins>
     </build>
+    <modules>
+        <module>org.apache.aries.jax-rs.example</module>
+        <module>org.apache.aries.jax-rs.cxf-common</module>
+        <module>org.apache.aries.rest.extender</module>
+    </modules>
     <dependencies>
         <dependency>
             <groupId>org.osgi</groupId>
@@ -71,4 +76,11 @@
             <layout>default</layout>
         </repository>
     </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>bnd-snapshots</id>
+            <url>https://bndtools.ci.cloudbees.com/job/bnd.master/lastSuccessfulBuild/artifact/dist/bundles/</url>
+            <layout>default</layout>
+        </pluginRepository>
+    </pluginRepositories>
 </project>
