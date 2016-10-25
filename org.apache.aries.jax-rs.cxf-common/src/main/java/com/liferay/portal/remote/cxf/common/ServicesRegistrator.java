@@ -43,21 +43,6 @@ public class ServicesRegistrator {
 		_properties = properties;
 	}
 
-	@SuppressWarnings("unused")
-	protected void addExtension(
-		Map<String, Object> properties, Object extension) {
-
-		Class<?> extensionClass = (Class<?>) properties.get(
-			"cxf.extension.class");
-
-		if (extensionClass == null) {
-			extensionClass = extension.getClass();
-		}
-
-		_extensions.put(extensionClass, extension);
-	}
-
-	@SuppressWarnings("unused")
 	public void start() {
 		Dictionary<String, Object> properties = new Hashtable<>();
 
@@ -89,7 +74,7 @@ public class ServicesRegistrator {
 			(CXFBusFactory) CXFBusFactory.newInstance(
 				CXFBusFactory.class.getName());
 
-		Bus bus = cxfBusFactory.createBus(_extensions);
+		Bus bus = cxfBusFactory.createBus();
 
 		properties = new Hashtable<>();
 
@@ -117,7 +102,6 @@ public class ServicesRegistrator {
 			Bus.class, bus, properties);
 	}
 
-	@SuppressWarnings("unused")
 	public void stop() {
 		try {
 			_busServiceRegistration.unregister();
@@ -159,7 +143,6 @@ public class ServicesRegistrator {
 
 	private final BundleContext _bundleContext;
 	private ServiceRegistration<Bus> _busServiceRegistration;
-	private final Map<Class<?>, Object> _extensions = new HashMap<>();
 	private final Map<String, Object> _properties;
 	private ServiceRegistration<ServletContextHelper>
 		_servletContextHelperServiceRegistration;
