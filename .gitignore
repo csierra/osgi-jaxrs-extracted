@@ -6,6 +6,7 @@
 */.settings/
 */bin/
 **/build/
+**/generated/
 **/target/
-/test-cxf/felix-cache/
-/test-cxf/bundle/
+/bndrun/*.jar
+/bndrun/cnf/
