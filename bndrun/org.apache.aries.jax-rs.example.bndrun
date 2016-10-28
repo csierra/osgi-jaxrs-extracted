@@ -1,4 +1,5 @@
 -standalone:
+-include: ${.}/augments.bnd
 
 -plugin.pom.repo = \
 	aQute.bnd.repository.maven.pom.provider.BndPomRepository; \
