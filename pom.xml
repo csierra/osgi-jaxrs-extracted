@@ -48,9 +48,11 @@
         </plugins>
     </build>
     <modules>
+        <module>org.apache.aries.jax-rs.extender</module>
         <module>org.apache.aries.jax-rs.example</module>
-        <module>org.apache.aries.jax-rs.cxf-common</module>
-        <module>org.apache.aries.rest.extender</module>
+        <module>org.apache.aries.jax-rs.bndrun</module>
+        <module>org.apache.aries.jax-rs.tests</module>
+        <module>org.apache.aries.jax-rs.integration-test</module>
     </modules>
     <dependencies>
         <dependency>

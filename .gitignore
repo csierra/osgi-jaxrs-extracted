@@ -8,5 +8,6 @@
 **/build/
 **/generated/
 **/target/
-/bndrun/*.jar
-/bndrun/cnf/
+*/*.jar
+*/cnf/
+*/TEST-*.xml
