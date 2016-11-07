@@ -48,11 +48,11 @@
         </plugins>
     </build>
     <modules>
-        <module>org.apache.aries.jax-rs.extender</module>
-        <module>org.apache.aries.jax-rs.example</module>
-        <module>org.apache.aries.jax-rs.bndrun</module>
-        <module>org.apache.aries.jax-rs.tests</module>
-        <module>org.apache.aries.jax-rs.integration-test</module>
+        <module>jax-rs.whiteboard</module>
+        <module>jax-rs.itests</module>
+        <module>jax-rs.itests-run</module>
+        <module>jax-rs.example</module>
+        <module>jax-rs.example-run</module>
     </modules>
     <dependencies>
         <dependency>

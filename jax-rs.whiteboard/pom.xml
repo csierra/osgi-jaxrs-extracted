@@ -9,9 +9,9 @@
         <artifactId>org.apache.aries.jax-rs</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>org.apache.aries.jax-rs.extender</artifactId>
+    <artifactId>org.apache.aries.jax-rs.whiteboard</artifactId>
     <packaging>jar</packaging>
-    <description>Aries JAX-RS Extender</description>
+    <description>Apache Aries JAX-RS Whiteboard</description>
     <dependencies>
         <dependency>
             <groupId>javax.servlet</groupId>

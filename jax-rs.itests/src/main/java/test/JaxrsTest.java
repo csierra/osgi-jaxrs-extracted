@@ -29,11 +29,9 @@ public class JaxrsTest extends TestCase {
 			serviceRegistration = bundleContext.registerService(
 				Object.class, testAddon, properties);
 
-			// TODO this availability should be checked through a jaxrs runtime service of some kind
+			// TODO this availability should be checked through a jaxrs runtime service
 
-			Filter filter = bundleContext.createFilter(
-					"(&(objectClass=com.liferay.portal.remote.rest.extender.internal.CXFJaxRsServiceRegistrator)" +
-						"(CXF_ENDPOINT_ADDRESS=/test-addon))");
+			Filter filter = bundleContext.createFilter("(CXF_ENDPOINT_ADDRESS=/test-addon)");
 
 			ServiceTracker<?, ?> st = new ServiceTracker<>(bundleContext, filter, null);
 

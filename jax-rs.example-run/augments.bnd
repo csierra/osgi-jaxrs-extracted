@@ -4,12 +4,7 @@
 
 -augment.javax.ws.rs-api: \
 	javax.ws.rs-api; \
-		requirement:="osgi.implementation;filter:='(osgi.implementation=osgi.http)'"
-
--augment.org.apache.aries.jax-rs.cxf-common: \
-	org.apache.aries.jax-rs.cxf-common; \
-		requirement:="osgi.extender;filter:='(&(osgi.extender=aries.jax-rs)(version>=1.0.0)(!(version>=2.0.0)))', \
-		              osgi.implementation;filter:='(osgi.implementation=osgi.http)'"
+		requirement:="osgi.implementation;filter:='(osgi.implementation=aries.jax-rs)'"
 
 -augment.org.apache.commons.fileupload: \
 	org.apache.commons.fileupload; \

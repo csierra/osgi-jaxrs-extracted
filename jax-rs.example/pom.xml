@@ -11,7 +11,7 @@
     </parent>
     <artifactId>org.apache.aries.jax-rs.example</artifactId>
     <packaging>jar</packaging>
-    <description>JAX-RS Example</description>
+    <description>Apache Aries JAX-RS Example</description>
     <dependencies>
         <dependency>
             <groupId>javax.ws.rs</groupId>

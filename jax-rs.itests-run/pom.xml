@@ -11,7 +11,7 @@
 		<relativePath>..</relativePath>
 	</parent>
 
-	<artifactId>org.apache.aries.jax-rs.integration-test</artifactId>
+	<artifactId>org.apache.aries.jax-rs.itests-run</artifactId>
 
 	<packaging>pom</packaging>
 
@@ -25,7 +25,7 @@
 					<failOnChanges>false</failOnChanges>
 					<resolve>false</resolve>
 					<bndruns>
-						<bndrun>integration-test.bndrun</bndrun>
+						<bndrun>itest.bndrun</bndrun>
 					</bndruns>
 					<targetDir>.</targetDir>
 				</configuration>
@@ -42,12 +42,12 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.aries</groupId>
-			<artifactId>org.apache.aries.jax-rs.extender</artifactId>
+			<artifactId>org.apache.aries.jax-rs.itests</artifactId>
 			<version>1.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.aries</groupId>
-			<artifactId>org.apache.aries.jax-rs.tests</artifactId>
+			<artifactId>org.apache.aries.jax-rs.whiteboard</artifactId>
 			<version>1.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>

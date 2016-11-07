@@ -1,8 +1,11 @@
 Bundle-Activator: com.liferay.portal.remote.rest.extender.activator.CXFJaxRsBundleActivator
 Provide-Capability: \
-    osgi.extender; \
-        osgi.extender='aries.jax-rs'; \
-		version:Version='1.0.0'
+    osgi.implementation; \
+        osgi.implementation='aries.jax-rs'; \
+		version:Version='${Bundle-Version}'
+Require-Capability: \
+    osgi.implementation; \
+        filter:='(osgi.implementation=osgi.http)'
 Import-Package:\
 	!com.sun.*,\
 	!com.ctc.wstx.*,\
@@ -44,8 +47,8 @@ Import-Package:\
 #            uses:="javax.json,javax.json.spi,javax.json.stream";\
 #            version:Version=1
 
-#-exportcontents:\
-#	org.apache.cxf.jaxrs.ext.*
+-exportcontents:\
+	org.apache.cxf.jaxrs.ext.*
 
 -includeresource:\
 	lib/cxf-core.jar=cxf-core-*.jar;lib:=true,\

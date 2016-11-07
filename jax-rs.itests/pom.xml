@@ -11,7 +11,7 @@
 		<version>1.0.0-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>org.apache.aries.jax-rs.tests</artifactId>
+	<artifactId>org.apache.aries.jax-rs.itests</artifactId>
 
 	<dependencies>
         <dependency>

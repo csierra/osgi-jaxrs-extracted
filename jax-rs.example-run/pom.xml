@@ -8,9 +8,9 @@
 	    <version>1.0.0-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>org.apache.aries.jax-rs.bndrun</artifactId>
+	<artifactId>org.apache.aries.jax-rs.example-run</artifactId>
 
-	<packaging>jar</packaging>
+	<packaging>pom</packaging>
 
 	<build>
 		<plugins>
@@ -22,10 +22,17 @@
 					<failOnChanges>false</failOnChanges>
 					<resolve>true</resolve>
 					<bndruns>
-						<bndrun>run.bndrun</bndrun>
+						<bndrun>example.bndrun</bndrun>
 					</bndruns>
 					<targetDir>.</targetDir>
-				</configuration>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>export</goal>
+                        </goals>
+                    </execution>
+                </executions>
 			</plugin>
 		</plugins>
 	</build>
@@ -37,7 +44,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.aries</groupId>
-			<artifactId>org.apache.aries.jax-rs.extender</artifactId>
+			<artifactId>org.apache.aries.jax-rs.whiteboard</artifactId>
 			<version>1.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
@@ -53,11 +60,6 @@
 		<dependency>
 			<groupId>org.apache.felix</groupId>
 			<artifactId>org.apache.felix.gogo.jline</artifactId>
-			<version>1.0.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.felix</groupId>
-			<artifactId>org.apache.felix.gogo.runtime</artifactId>
 			<version>1.0.0</version>
 		</dependency>
 		<dependency>

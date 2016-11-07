@@ -69,8 +69,7 @@ public class CXFJaxRsBundleActivator implements BundleActivator {
 
 		// TODO make the context path of the JAX-RS Whiteboard configurable.
 
-		_servicesRegistrator = new ServicesRegistrator(
-			bundleContext, Collections.singletonMap("contextPath", "/"));
+		_servicesRegistrator = new ServicesRegistrator(bundleContext);
 
 		_servicesRegistrator.start();
 
