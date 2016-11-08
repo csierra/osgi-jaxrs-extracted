@@ -49,6 +49,7 @@
     </build>
     <modules>
         <module>jax-rs.whiteboard</module>
+        <module>jax-rs.log4j-configuration</module>
         <module>jax-rs.itests</module>
         <module>jax-rs.itests-run</module>
         <module>jax-rs.example</module>
