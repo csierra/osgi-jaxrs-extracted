@@ -15,30 +15,33 @@
  * limitations under the License.
  */
 
-package test.types;
+package org.apache.aries.jax.rs.example;
 
-import javax.annotation.PostConstruct;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.UriInfo;
+import org.osgi.service.component.annotations.Component;
 
-//property = "osgi.jaxrs.resource.base=/test-addon",
-public class TestAddon {
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.ext.Provider;
+import java.io.IOException;
 
-	@GET
-	@Path("/{name}")
-	public String sayHello(@PathParam("name") String name) {
-		return "Hello " + name;
+/**
+ * @author Carlos Sierra Andrés
+ */
+@Component(
+	immediate = true,
+	property = {
+		"jaxrs.application.select=(component.name=ExampleApplication)",
+		"osgi.jaxrs.filter.base=/examples"
 	}
+)
+@Provider
+public class ExampleFilter implements ContainerRequestFilter {
 
-	@PostConstruct
-	public void init() {
-		System.out.println("URIINFO: " + _uriInfo);
+	@Override
+	public void filter(ContainerRequestContext requestContext)
+		throws IOException {
+
+		System.out.println("FILTERED!");
 	}
-
-	@Context
-	UriInfo _uriInfo;
 
 }

@@ -15,30 +15,35 @@
  * limitations under the License.
  */
 
-package test.types;
+package org.apache.aries.jax.rs.example;
 
-import javax.annotation.PostConstruct;
+import org.osgi.service.component.annotations.Component;
+
 import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.UriInfo;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Application;
+import java.util.Collections;
+import java.util.Set;
 
-//property = "osgi.jaxrs.resource.base=/test-addon",
-public class TestAddon {
+/**
+ * @author Carlos Sierra Andrés
+ */
+@Component(
+	immediate = true,
+	property = "osgi.jaxrs.application.base=/example-application",
+	service = Application.class
+)
+public class ExampleApplication extends Application {
+
+	@Override
+	public Set<Object> getSingletons() {
+		return Collections.<Object>singleton(this);
+	}
 
 	@GET
-	@Path("/{name}")
-	public String sayHello(@PathParam("name") String name) {
-		return "Hello " + name;
+	@Produces("text/plain")
+	public String sayHello() {
+		return "Hello world";
 	}
-
-	@PostConstruct
-	public void init() {
-		System.out.println("URIINFO: " + _uriInfo);
-	}
-
-	@Context
-	UriInfo _uriInfo;
 
 }

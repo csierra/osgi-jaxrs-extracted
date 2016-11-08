@@ -1,24 +1,21 @@
-/**
- * Copyright (c) 2000-present Liferay, Inc. All rights reserved.
- * <p>
- * This library is free software; you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * <p>
- * This library is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-package com.liferay.portal.remote.rest.extender.internal;
-
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Map;
-
-import javax.ws.rs.core.Application;
+package org.apache.aries.jax.rs.whiteboard.internal;
 
 import org.apache.cxf.Bus;
 import org.osgi.framework.BundleContext;
@@ -26,17 +23,24 @@ import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
+import javax.ws.rs.core.Application;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * @author Carlos Sierra Andrés
  */
-class ApplicationServiceTrackerCustomizer
+class SingletonServiceTrackerCustomizer
 	implements ServiceTrackerCustomizer
-		<Application, ApplicationServiceTrackerCustomizer.Tracked> {
+		<Object, SingletonServiceTrackerCustomizer.Tracked> {
 
 	private BundleContext _bundleContext;
 	private Bus _bus;
 
-	public ApplicationServiceTrackerCustomizer(
+	public SingletonServiceTrackerCustomizer(
 		BundleContext bundleContext, Bus bus) {
 
 		_bundleContext = bundleContext;
@@ -45,9 +49,9 @@ class ApplicationServiceTrackerCustomizer
 
 	@Override
 	public Tracked addingService(
-		ServiceReference<Application> serviceReference) {
+		ServiceReference<Object> serviceReference) {
 
-		Application application = _bundleContext.getService(
+		final Object service = _bundleContext.getService(
 			serviceReference);
 
 		try {
@@ -57,25 +61,36 @@ class ApplicationServiceTrackerCustomizer
 				propertyKeys.length);
 
 			for (String propertyKey : propertyKeys) {
+				if (propertyKey.equals("osgi.jaxrs.resource.base")) {
+					continue;
+				}
 				properties.put(
 					propertyKey, serviceReference.getProperty(propertyKey));
 			}
 
 			properties.put(
 				"CXF_ENDPOINT_ADDRESS",
-				serviceReference.getProperty("osgi.jaxrs.application.base").
+				serviceReference.getProperty("osgi.jaxrs.resource.base").
 					toString());
 
 			CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
-				new CXFJaxRsServiceRegistrator(_bus, application, properties);
+				new CXFJaxRsServiceRegistrator(
+					_bus,
+					new Application() {
+						@Override
+						public Set<Object> getSingletons() {
+							return Collections.singleton(service);
+						}
+					},
+					properties);
 
 			return new Tracked(
-				cxfJaxRsServiceRegistrator, application,
+				cxfJaxRsServiceRegistrator, service,
 				_bundleContext.registerService(
 					CXFJaxRsServiceRegistrator.class,
 					cxfJaxRsServiceRegistrator, new Hashtable<>(properties)));
 		}
-		catch (Throwable e) {
+		catch (Exception e) {
 			_bundleContext.ungetService(serviceReference);
 
 			throw e;
@@ -84,7 +99,7 @@ class ApplicationServiceTrackerCustomizer
 
 	@Override
 	public void modifiedService(
-		ServiceReference<Application> serviceReference, Tracked tracked) {
+		ServiceReference<Object> serviceReference, Tracked tracked) {
 
 		removedService(serviceReference, tracked);
 
@@ -93,11 +108,16 @@ class ApplicationServiceTrackerCustomizer
 
 	@Override
 	public void removedService(
-		ServiceReference<Application> reference, Tracked tracked) {
+		ServiceReference<Object> reference, Tracked tracked) {
 
 		_bundleContext.ungetService(reference);
 
-		tracked.getCxfJaxRsServiceRegistrator().close();
+		Object service = tracked.getService();
+
+		CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator =
+			tracked.getCxfJaxRsServiceRegistrator();
+
+		cxfJaxRsServiceRegistrator.close();
 
 		tracked.getCxfJaxRsServiceRegistratorServiceRegistration().unregister();
 	}
@@ -105,12 +125,12 @@ class ApplicationServiceTrackerCustomizer
 	public static class Tracked {
 
 		private final CXFJaxRsServiceRegistrator _cxfJaxRsServiceRegistrator;
-		private final Application _application;
+		private final Object _service;
 		private final ServiceRegistration<CXFJaxRsServiceRegistrator>
 			_cxfJaxRsServiceRegistratorServiceRegistration;
 
-		public Application getApplication() {
-			return _application;
+		public Object getService() {
+			return _service;
 		}
 
 		public CXFJaxRsServiceRegistrator getCxfJaxRsServiceRegistrator() {
@@ -125,17 +145,18 @@ class ApplicationServiceTrackerCustomizer
 
 		public Tracked(
 			CXFJaxRsServiceRegistrator cxfJaxRsServiceRegistrator,
-			Application application,
+			Object service,
 			ServiceRegistration<CXFJaxRsServiceRegistrator>
 				cxfJaxRsServiceRegistratorServiceRegistration) {
 
 			_cxfJaxRsServiceRegistrator = cxfJaxRsServiceRegistrator;
-			_application = application;
+			_service = service;
 			_cxfJaxRsServiceRegistratorServiceRegistration =
 				cxfJaxRsServiceRegistratorServiceRegistration;
 		}
 
 	}
+
 }
 
 

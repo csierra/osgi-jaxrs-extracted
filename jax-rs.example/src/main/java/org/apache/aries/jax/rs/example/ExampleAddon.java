@@ -15,7 +15,9 @@
  * limitations under the License.
  */
 
-package test.types;
+package org.apache.aries.jax.rs.example;
+
+import org.osgi.service.component.annotations.Component;
 
 import javax.annotation.PostConstruct;
 import javax.ws.rs.GET;
@@ -24,8 +26,15 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.UriInfo;
 
-//property = "osgi.jaxrs.resource.base=/test-addon",
-public class TestAddon {
+/**
+ * @author Carlos Sierra Andrés
+ */
+@Component(
+	immediate = true,
+	property = "osgi.jaxrs.resource.base=/examples/example-addon",
+	service = ExampleAddon.class
+)
+public class ExampleAddon {
 
 	@GET
 	@Path("/{name}")
