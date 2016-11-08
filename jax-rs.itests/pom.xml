@@ -12,6 +12,9 @@
 	</parent>
 
 	<artifactId>org.apache.aries.jax.rs.itests</artifactId>
+	<description>Apache Aries JAX-RS Integration Tests</description>
+	<name>Apache Aries JAX-RS Integration Tests</name>
+	<version>0.0.1-SNAPSHOT</version>
 
 	<dependencies>
         <dependency>

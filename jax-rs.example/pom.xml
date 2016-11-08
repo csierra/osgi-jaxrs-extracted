@@ -9,9 +9,12 @@
         <artifactId>org.apache.aries.jax.rs</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
+
     <artifactId>org.apache.aries.jax.rs.example</artifactId>
-    <packaging>jar</packaging>
     <description>Apache Aries JAX-RS Example</description>
+    <name>Apache Aries JAX-RS Example</name>
+    <version>0.0.1-SNAPSHOT</version>
+
     <dependencies>
         <dependency>
             <groupId>javax.ws.rs</groupId>

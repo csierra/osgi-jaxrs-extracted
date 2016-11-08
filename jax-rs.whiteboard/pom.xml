@@ -9,9 +9,12 @@
         <artifactId>org.apache.aries.jax.rs</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
+
     <artifactId>org.apache.aries.jax.rs.whiteboard</artifactId>
-    <packaging>jar</packaging>
     <description>Apache Aries JAX-RS Whiteboard</description>
+    <name>Apache Aries JAX-RS Whiteboard</name>
+    <version>0.0.1-SNAPSHOT</version>
+
     <dependencies>
         <dependency>
             <groupId>javax.servlet</groupId>
