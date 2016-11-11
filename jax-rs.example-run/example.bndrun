@@ -11,9 +11,9 @@
 		location=${.}/target/cached.xml
 
 -runrequires: \
-	osgi.identity;filter:='(osgi.identity=org.apache.aries.jax.rs.example)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.aries.jax.rs.log4j-configuration)',\
-	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.jline)'
+	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.jline)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.felix.fileinstall)'
 
    # ,\
 #	osgi.identity;filter:='(osgi.identity=org.apache.aries.jax.rs.whiteboard)'
@@ -24,11 +24,11 @@
 	javax.json-api; version='[1.0.0,1.0.1)',\
 	javax.ws.rs-api; version='[2.0.1,2.0.2)',\
 	log4j; version='[1.2.17,1.2.18)',\
-	org.apache.aries.jax.rs.example; version='[0.0.1,0.0.2)',\
 	org.apache.aries.jax.rs.log4j-configuration; version='[0.0.1,0.0.2)',\
 	org.apache.aries.jax.rs.whiteboard; version='[0.0.1,0.0.2)',\
 	org.apache.felix.bundlerepository; version='[1.6.0,1.6.1)',\
 	org.apache.felix.configadmin; version='[1.8.8,1.8.9)',\
+	org.apache.felix.fileinstall; version='[3.5.6,3.5.7)',\
 	org.apache.felix.gogo.command; version='[1.0.0,1.0.1)',\
 	org.apache.felix.gogo.jline; version='[1.0.0,1.0.1)',\
 	org.apache.felix.gogo.runtime; version='[1.0.0,1.0.1)',\
@@ -49,8 +49,9 @@
 -runee: JavaSE-1.8
 -resolve.effective: resolve, active
 -runproperties: \
-	osgi.console.enable.builtin=false, \
-	osgi.console=, \
+	felix.fileinstall.dir=bundles,\
+	osgi.console.enable.builtin=false,\
+	osgi.console=,\
 	org.osgi.service.http.port=8080
 -runsystemcapabilities.dflt: ${native_capability}
 -runblacklist:\
