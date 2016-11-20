@@ -15,7 +15,9 @@
 package org.apache.aries.osgi.functional;
 
 import org.apache.aries.osgi.functional.OSGiOperation.OSGiResult;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.BundleEvent;
 import org.osgi.framework.Filter;
 import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceObjects;
@@ -27,6 +29,8 @@ import org.osgi.service.cm.ManagedServiceFactory;
 import org.osgi.util.pushstream.PushStream;
 import org.osgi.util.pushstream.PushStreamProvider;
 import org.osgi.util.pushstream.SimplePushEventSource;
+import org.osgi.util.tracker.BundleTracker;
+import org.osgi.util.tracker.BundleTrackerCustomizer;
 import org.osgi.util.tracker.ServiceTracker;
 
 import java.util.Dictionary;
@@ -396,6 +400,64 @@ public class OSGi<T> {
 				x -> serviceTracker.close());
 		});
 	}
+
+	public static <T> OSGi<T> changeContext(
+		BundleContext bundleContext, OSGi<T> program) {
+
+		return new OSGi<>(b -> program._operation.run(bundleContext));
+	}
+
+	public static MOSGi<Bundle> bundles(int stateMask) {
+		return new MOSGi<>(bundleContext -> {
+			PushStreamProvider pushStreamProvider =
+				new PushStreamProvider();
+
+			SimplePushEventSource<Bundle> addedSource =
+				pushStreamProvider.createSimpleEventSource(null);
+
+			PushStream<Bundle> added = pushStreamProvider.createStream(addedSource);
+
+			SimplePushEventSource<Bundle> removedSource =
+				pushStreamProvider.createSimpleEventSource(null);
+
+			PushStream<Bundle> removed = pushStreamProvider.createStream(
+				removedSource);
+
+			BundleTracker<Bundle> bundleTracker =
+				new BundleTracker<>(
+					bundleContext, stateMask,
+					new BundleTrackerCustomizer<Bundle>() {
+
+					@Override
+					public Bundle addingBundle(
+						Bundle bundle, BundleEvent bundleEvent) {
+
+						addedSource.publish(bundle);
+
+						return bundle;
+					}
+
+					@Override
+					public void modifiedBundle(
+						Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
+
+						removedBundle(bundle, bundleEvent, bundle2);
+
+						addingBundle(bundle, bundleEvent);
+					}
+
+					@Override
+					public void removedBundle(Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
+						removedSource.publish(bundle);
+					}
+				});
+
+			return new OSGiResult<>(
+				added, removed, x -> bundleTracker.open(),
+				x -> bundleTracker.close());
+		});
+	}
+
 
 	private static <T> Filter buildFilter(
 		BundleContext bundleContext, String filterString, Class<T> clazz) {
