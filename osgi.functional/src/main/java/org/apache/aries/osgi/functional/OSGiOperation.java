@@ -15,9 +15,9 @@
 package org.apache.aries.osgi.functional;
 
 import org.osgi.framework.BundleContext;
-import org.osgi.util.pushstream.PushStream;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * @author Carlos Sierra Andrés
@@ -27,13 +27,13 @@ public interface OSGiOperation<T> {
 	OSGiResult<T> run(BundleContext bundleContext);
 
 	class OSGiResult<T> {
-		PushStream<T> added;
-		PushStream<T> removed;
+		Function<Object, T> added;
+		Function<Object, T> removed;
 		Consumer<Void> start;
 		Consumer<Void> close;
 
 		OSGiResult(
-			PushStream<T> added, PushStream<T> removed,
+			Function<Object, T> added, Function<Object, T> removed,
 			Consumer<Void> start, Consumer<Void> close) {
 
 			this.added = added;
@@ -43,6 +43,19 @@ public interface OSGiOperation<T> {
 		}
 	}
 
+	public static class Tuple<T> {
+		public Object original;
+		public T t;
 
+		public Tuple(Object original, T t) {
+			this.original = original;
+			this.t = t;
+		}
+
+		public <S> Tuple<S> map(Function<T, S> fun) {
+			return new Tuple<>(original, fun.apply(t));
+		}
+
+	}
 
 }

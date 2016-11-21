@@ -62,26 +62,26 @@ public class OSGi<T> {
 		return new OSGi<>(((bundleContext) -> {
 			OSGiResult<T> osgiResult = _operation.run(bundleContext);
 
-			return new OSGiResult<>(
-				osgiResult.added.map(function),
-				osgiResult.removed.map(function),
-				osgiResult.start,
-				osgiResult.close);
+			OSGiResult<S> osgiResult2 = (OSGiResult<S>) osgiResult;
+
+			osgiResult2.added = osgiResult.added.andThen(function);
+			osgiResult2.removed = osgiResult.removed.andThen(function);
+
+			return osgiResult2;
 		}));
 	}
 
 	public static <S> OSGi<S> just(S s) {
 		return new OSGi<>(((bundleContext) -> {
-			PushStreamProvider pushStreamProvider = new PushStreamProvider();
 
-			SimplePushEventSource<S> source =
-				pushStreamProvider.createSimpleEventSource(null);
+			Function<Object, S> publish = x -> s;
 
-			PushStream<S> stream = pushStreamProvider.createStream(source);
+			OSGiResult<S> osgiResult = new OSGiResult<>(
+				publish, a -> null, null, NOOP);
 
-			return new OSGiResult<>(
-				stream, pushStreamProvider.streamOf(Stream.empty()),
-				x -> source.publish(s), NOOP);
+			osgiResult.start = x -> ((Function)osgiResult.added).apply(s);
+
+			return osgiResult;
 		}));
 	}
 
@@ -92,24 +92,29 @@ public class OSGi<T> {
 
 				Map<T, OSGiResult<S>> map = new IdentityHashMap<>();
 
-				PushStreamProvider pushStreamProvider =
-					new PushStreamProvider();
-
-				SimplePushEventSource<S> addedSource =
-					pushStreamProvider.createSimpleEventSource(null);
-
-				PushStream<S> added = pushStreamProvider.createStream(
-					addedSource);
-
 				AtomicReference<Consumer<Void>> closeReference =
 					new AtomicReference<>(x -> {});
 
-				Consumer<Void> start = s -> {
+				Function<Object, S> added = s -> (S)s;
+
+				OSGiResult<S> osgiResult = new OSGiResult<>(
+					added, x -> null, null,
+					x -> {
+						synchronized (map) {
+							for (OSGiResult<S> result : map.values()) {
+								close(result);
+							}
+						}
+
+						closeReference.get().accept(null);
+					});
+
+				osgiResult.start = s -> {
 					OSGiResult<T> or1 = _operation.run(bundleContext);
 
 					closeReference.set(or1.close);
 
-					or1.added.forEach(t -> {
+					or1.added = or1.added.andThen(t -> {
 						OSGi<S> program = fun.apply(t);
 
 						OSGiResult<S> or2 = program._operation.run(
@@ -127,36 +132,30 @@ public class OSGi<T> {
 							}
 						};
 
-						or2.added.forEach(addedSource::publish);
-						or2.added.onClose(() -> close.accept(null));
+						or2.added.andThen(osgiResult.added::apply);
+//						or2.added.onClose(() -> close.accept(null));
 
 						or2.start.accept(null);
+
+						return null;
 					});
 
-					or1.removed.forEach(t -> {
+					or1.removed = or1.removed.andThen(t -> {
 						synchronized (map) {
-							OSGiResult<S> osgiResult = map.remove(t);
+							OSGiResult<S> osgiResult1 = map.remove(t);
 
-							if (osgiResult != null) {
-								OSGi.close(osgiResult);
+							if (osgiResult1 != null) {
+								OSGi.close(osgiResult1);
 							}
 						}
+
+						return null;
 					});
 
 					or1.start.accept(null);
 				};
 
-				return new OSGiResult<>(
-					added, pushStreamProvider.streamOf(Stream.empty()), start,
-					x -> {
-						synchronized (map) {
-							for (OSGiResult<S> result : map.values()) {
-								close(result);
-							}
-						}
-
-						closeReference.get().accept(null);
-					});
+				return osgiResult;
 			}
 		));
 	}
@@ -169,202 +168,196 @@ public class OSGi<T> {
 		return this.flatMap(fun).map(x -> null);
 	}
 
-	public static OSGi<Dictionary<String, ?>> configurations(
-		String factoryPid) {
+//	public static OSGi<Dictionary<String, ?>> configurations(
+//		String factoryPid) {
+//
+//		return new OSGi<>(bundleContext -> {
+//			PushStreamProvider pushStreamProvider =
+//				new PushStreamProvider();
+//
+//			SimplePushEventSource<Dictionary<String, ?>> addedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<Dictionary<String, ?>> added =
+//				pushStreamProvider.createStream(addedSource);
+//
+//			SimplePushEventSource<Dictionary<String, ?>> removedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<Dictionary<String, ?>> removed =
+//				pushStreamProvider.createStream(removedSource);
+//
+//			Map<String, Dictionary<String, ?>> results =
+//				new ConcurrentHashMap<>();
+//
+//			AtomicReference<ServiceRegistration<ManagedServiceFactory>>
+//				serviceRegistrationReference = new AtomicReference<>(null);
+//
+//			Consumer<Void> start = x ->
+//				serviceRegistrationReference.set(bundleContext.registerService(
+//					ManagedServiceFactory.class, new ManagedServiceFactory() {
+//						@Override
+//						public String getName() {
+//							return "Functional OSGi Managed Service Factory";
+//						}
+//
+//						@Override
+//						public void updated(
+//							String s, Dictionary<String, ?> dictionary)
+//							throws ConfigurationException {
+//
+//							results.put(s, dictionary);
+//
+//							addedSource.publish(dictionary);
+//						}
+//
+//						@Override
+//						public void deleted(String s) {
+//							Dictionary<String, ?> remove = results.remove(s);
+//
+//							removedSource.publish(remove);
+//
+//						}
+//					},
+//					new Hashtable<String, Object>() {{
+//						put("service.pid", factoryPid);
+//					}}));
+//
+//			return new OSGiResult<>(added, removed, start,
+//				x -> {
+//					serviceRegistrationReference.get().unregister();
+//
+//					for (Dictionary<String, ?> dictionary : results.values()) {
+//						removedSource.publish(dictionary);
+//					}
+//				});
+//		});
+//	}
 
-		return new OSGi<>(bundleContext -> {
-			PushStreamProvider pushStreamProvider =
-				new PushStreamProvider();
+//	public static OSGi<Dictionary<String, ?>> configuration(String pid) {
+//		return new OSGi<>(bundleContext -> {
+//			PushStreamProvider pushStreamProvider =
+//				new PushStreamProvider();
+//
+//			SimplePushEventSource<Dictionary<String, ?>> addedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<Dictionary<String, ?>> added =
+//				pushStreamProvider.createStream(addedSource);
+//
+//			SimplePushEventSource<Dictionary<String, ?>> removedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<Dictionary<String, ?>> removed =
+//				pushStreamProvider.createStream(removedSource);
+//
+//			AtomicReference<Dictionary<?, ?>> atomicReference =
+//				new AtomicReference<>(null);
+//
+//			AtomicReference<ServiceRegistration<ManagedService>>
+//				serviceRegistrationReferece = new AtomicReference<>(null);
+//
+//			Consumer<Void> start = x ->
+//				serviceRegistrationReferece.set(
+//					bundleContext.registerService(
+//						ManagedService.class,
+//						properties -> {
+//							if (properties == null) {
+//								addedSource.close();
+//							}
+//							else {
+//								if (atomicReference.compareAndSet(
+//									null, properties)) {
+//
+//									addedSource.publish(properties);
+//								}
+//								else {
+//									addedSource.close();
+//								}
+//							}
+//						},
+//						new Hashtable<String, Object>() {{
+//							put("service.pid", pid);
+//						}}));
+//
+//
+//			return new OSGiResult<>(
+//				added, removed, start,
+//				x -> serviceRegistrationReferece.get().unregister());
+//		});
+//	}
 
-			SimplePushEventSource<Dictionary<String, ?>> addedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<Dictionary<String, ?>> added =
-				pushStreamProvider.createStream(addedSource);
-
-			SimplePushEventSource<Dictionary<String, ?>> removedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<Dictionary<String, ?>> removed =
-				pushStreamProvider.createStream(removedSource);
-
-			Map<String, Dictionary<String, ?>> results =
-				new ConcurrentHashMap<>();
-
-			AtomicReference<ServiceRegistration<ManagedServiceFactory>>
-				serviceRegistrationReference = new AtomicReference<>(null);
-
-			Consumer<Void> start = x ->
-				serviceRegistrationReference.set(bundleContext.registerService(
-					ManagedServiceFactory.class, new ManagedServiceFactory() {
-						@Override
-						public String getName() {
-							return "Functional OSGi Managed Service Factory";
-						}
-
-						@Override
-						public void updated(
-							String s, Dictionary<String, ?> dictionary)
-							throws ConfigurationException {
-
-							results.put(s, dictionary);
-
-							addedSource.publish(dictionary);
-						}
-
-						@Override
-						public void deleted(String s) {
-							Dictionary<String, ?> remove = results.remove(s);
-
-							removedSource.publish(remove);
-
-						}
-					},
-					new Hashtable<String, Object>() {{
-						put("service.pid", factoryPid);
-					}}));
-
-			return new OSGiResult<>(added, removed, start,
-				x -> {
-					serviceRegistrationReference.get().unregister();
-
-					for (Dictionary<String, ?> dictionary : results.values()) {
-						removedSource.publish(dictionary);
-					}
-				});
-		});
-	}
-
-	public static OSGi<Dictionary<String, ?>> configuration(String pid) {
-		return new OSGi<>(bundleContext -> {
-			PushStreamProvider pushStreamProvider =
-				new PushStreamProvider();
-
-			SimplePushEventSource<Dictionary<String, ?>> addedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<Dictionary<String, ?>> added =
-				pushStreamProvider.createStream(addedSource);
-
-			SimplePushEventSource<Dictionary<String, ?>> removedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<Dictionary<String, ?>> removed =
-				pushStreamProvider.createStream(removedSource);
-
-			AtomicReference<Dictionary<?, ?>> atomicReference =
-				new AtomicReference<>(null);
-
-			AtomicReference<ServiceRegistration<ManagedService>>
-				serviceRegistrationReferece = new AtomicReference<>(null);
-
-			Consumer<Void> start = x ->
-				serviceRegistrationReferece.set(
-					bundleContext.registerService(
-						ManagedService.class,
-						properties -> {
-							if (properties == null) {
-								addedSource.close();
-							}
-							else {
-								if (atomicReference.compareAndSet(
-									null, properties)) {
-
-									addedSource.publish(properties);
-								}
-								else {
-									addedSource.close();
-								}
-							}
-						},
-						new Hashtable<String, Object>() {{
-							put("service.pid", pid);
-						}}));
-
-
-			return new OSGiResult<>(
-				added, removed, start,
-				x -> serviceRegistrationReferece.get().unregister());
-		});
-	}
-
-	public static OSGi<Void> onClose(Consumer<Void> action) {
-		PushStreamProvider pushStreamProvider = new PushStreamProvider();
-
-		return new OSGi<>(bundleContext -> new OSGiResult<>(
-			pushStreamProvider.streamOf(Stream.empty()),
-			pushStreamProvider.streamOf(Stream.empty()), NOOP, action::accept));
-	}
+//	public static OSGi<Void> onClose(Consumer<Void> action) {
+//		PushStreamProvider pushStreamProvider = new PushStreamProvider();
+//
+//		return new OSGi<>(bundleContext -> new OSGiResult<>(
+//			pushStreamProvider.streamOf(Stream.empty()),
+//			pushStreamProvider.streamOf(Stream.empty()), NOOP, action::accept));
+//	}
 
 	public static <T> MOSGi<T> services(Class<T> clazz) {
 		return services(clazz, null);
 	}
 
-	public static <T> OSGi<ServiceReference<T>> serviceReferences(
-		Class<T> clazz, String filterString) {
-
-		return new OSGi<>(bundleContext -> {
-			PushStreamProvider pushStreamProvider =
-				new PushStreamProvider();
-
-			SimplePushEventSource<ServiceReference<T>> addedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<ServiceReference<T>> added =
-				pushStreamProvider.createStream(addedSource);
-
-			SimplePushEventSource<ServiceReference<T>> removedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<ServiceReference<T>> removed =
-				pushStreamProvider.createStream(removedSource);
-
-			ServiceTracker<T, ServiceReference<T>> serviceTracker =
-				new ServiceTracker<T, ServiceReference<T>>(
-					bundleContext,
-					buildFilter(bundleContext, filterString, clazz), null) {
-
-					@Override
-					public ServiceReference<T> addingService(
-						ServiceReference<T> reference) {
-
-						addedSource.publish(reference);
-
-						return reference;
-					}
-
-					@Override
-					public void removedService(
-						ServiceReference<T> reference, ServiceReference<T> t) {
-
-						super.removedService(reference, t);
-
-						removedSource.publish(t);
-					}
-				};
-
-			return new OSGiResult<>(
-				added, removed, x -> serviceTracker.open(),
-				x -> serviceTracker.close());
-
-		});
-	}
+//	public static <T> OSGi<ServiceReference<T>> serviceReferences(
+//		Class<T> clazz, String filterString) {
+//
+//		return new OSGi<>(bundleContext -> {
+//			PushStreamProvider pushStreamProvider =
+//				new PushStreamProvider();
+//
+//			SimplePushEventSource<ServiceReference<T>> addedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<ServiceReference<T>> added =
+//				pushStreamProvider.createStream(addedSource);
+//
+//			SimplePushEventSource<ServiceReference<T>> removedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<ServiceReference<T>> removed =
+//				pushStreamProvider.createStream(removedSource);
+//
+//			ServiceTracker<T, ServiceReference<T>> serviceTracker =
+//				new ServiceTracker<T, ServiceReference<T>>(
+//					bundleContext,
+//					buildFilter(bundleContext, filterString, clazz), null) {
+//
+//					@Override
+//					public ServiceReference<T> addingService(
+//						ServiceReference<T> reference) {
+//
+//						addedSource.publish(reference);
+//
+//						return reference;
+//					}
+//
+//					@Override
+//					public void removedService(
+//						ServiceReference<T> reference, ServiceReference<T> t) {
+//
+//						super.removedService(reference, t);
+//
+//						removedSource.publish(t);
+//					}
+//				};
+//
+//			return new OSGiResult<>(
+//				added, removed, x -> serviceTracker.open(),
+//				x -> serviceTracker.close());
+//
+//		});
+//	}
 
 	public static <T> MOSGi<T> services(Class<T> clazz, String filterString) {
 		return new MOSGi<>(bundleContext -> {
-			PushStreamProvider pushStreamProvider =
-				new PushStreamProvider();
 
-			SimplePushEventSource<T> addedSource =
-				pushStreamProvider.createSimpleEventSource(null);
+			Function<Object, T> added = x -> (T)x;
 
-			PushStream<T> added = pushStreamProvider.createStream(addedSource);
+			Function<Object, T> removed = x -> (T)x;
 
-			SimplePushEventSource<T> removedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<T> removed = pushStreamProvider.createStream(
-				removedSource);
+			OSGiResult<T> osgiResult = new OSGiResult<>(
+				added, removed, null, null);
 
 			ServiceTracker<T, T> serviceTracker =
 				new ServiceTracker<T, T>(
@@ -380,7 +373,7 @@ public class OSGi<T> {
 
 						T t = super.addingService(reference);
 
-						addedSource.publish(t);
+						osgiResult.added.apply(t);
 
 						return t;
 					}
@@ -391,13 +384,14 @@ public class OSGi<T> {
 
 						super.removedService(reference, t);
 
-						removedSource.publish(t);
+						osgiResult.removed.apply(t);
 					}
 				};
 
-			return new OSGiResult<>(
-				added, removed, x -> serviceTracker.open(),
-				x -> serviceTracker.close());
+			osgiResult.start = x -> serviceTracker.open();
+			osgiResult.close = x -> serviceTracker.close();
+
+			return osgiResult;
 		});
 	}
 
@@ -407,56 +401,56 @@ public class OSGi<T> {
 		return new OSGi<>(b -> program._operation.run(bundleContext));
 	}
 
-	public static MOSGi<Bundle> bundles(int stateMask) {
-		return new MOSGi<>(bundleContext -> {
-			PushStreamProvider pushStreamProvider =
-				new PushStreamProvider();
-
-			SimplePushEventSource<Bundle> addedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<Bundle> added = pushStreamProvider.createStream(addedSource);
-
-			SimplePushEventSource<Bundle> removedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<Bundle> removed = pushStreamProvider.createStream(
-				removedSource);
-
-			BundleTracker<Bundle> bundleTracker =
-				new BundleTracker<>(
-					bundleContext, stateMask,
-					new BundleTrackerCustomizer<Bundle>() {
-
-					@Override
-					public Bundle addingBundle(
-						Bundle bundle, BundleEvent bundleEvent) {
-
-						addedSource.publish(bundle);
-
-						return bundle;
-					}
-
-					@Override
-					public void modifiedBundle(
-						Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
-
-						removedBundle(bundle, bundleEvent, bundle2);
-
-						addingBundle(bundle, bundleEvent);
-					}
-
-					@Override
-					public void removedBundle(Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
-						removedSource.publish(bundle);
-					}
-				});
-
-			return new OSGiResult<>(
-				added, removed, x -> bundleTracker.open(),
-				x -> bundleTracker.close());
-		});
-	}
+//	public static MOSGi<Bundle> bundles(int stateMask) {
+//		return new MOSGi<>(bundleContext -> {
+//			PushStreamProvider pushStreamProvider =
+//				new PushStreamProvider();
+//
+//			SimplePushEventSource<Bundle> addedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<Bundle> added = pushStreamProvider.createStream(addedSource);
+//
+//			SimplePushEventSource<Bundle> removedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<Bundle> removed = pushStreamProvider.createStream(
+//				removedSource);
+//
+//			BundleTracker<Bundle> bundleTracker =
+//				new BundleTracker<>(
+//					bundleContext, stateMask,
+//					new BundleTrackerCustomizer<Bundle>() {
+//
+//					@Override
+//					public Bundle addingBundle(
+//						Bundle bundle, BundleEvent bundleEvent) {
+//
+//						addedSource.publish(bundle);
+//
+//						return bundle;
+//					}
+//
+//					@Override
+//					public void modifiedBundle(
+//						Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
+//
+//						removedBundle(bundle, bundleEvent, bundle2);
+//
+//						addingBundle(bundle, bundleEvent);
+//					}
+//
+//					@Override
+//					public void removedBundle(Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
+//						removedSource.publish(bundle);
+//					}
+//				});
+//
+//			return new OSGiResult<>(
+//				added, removed, x -> bundleTracker.open(),
+//				x -> bundleTracker.close());
+//		});
+//	}
 
 
 	private static <T> Filter buildFilter(
@@ -479,35 +473,35 @@ public class OSGi<T> {
 		return filter;
 	}
 
-	public static <T, S extends T> OSGi<ServiceRegistration<T>> register(
-		Class<T> clazz, S service, Map<String, Object> properties) {
-
-		return new OSGi<>(bundleContext -> {
-			ServiceRegistration<T> serviceRegistration =
-				bundleContext.registerService(
-					clazz, service, new Hashtable<>(properties));
-
-			PushStreamProvider pushStreamProvider =
-				new PushStreamProvider();
-
-			SimplePushEventSource<ServiceRegistration<T>> addedSource =
-				pushStreamProvider.createSimpleEventSource(null);
-
-			PushStream<ServiceRegistration<T>> added =
-				pushStreamProvider.createStream(addedSource);
-
-			return new OSGiResult<>(
-				added, pushStreamProvider.streamOf(Stream.empty()),
-				x -> addedSource.publish(serviceRegistration),
-				x -> {
-					try {
-						serviceRegistration.unregister();
-					}
-					catch (Exception e) {
-					}
-				});
-		});
-	}
+//	public static <T, S extends T> OSGi<ServiceRegistration<T>> register(
+//		Class<T> clazz, S service, Map<String, Object> properties) {
+//
+//		return new OSGi<>(bundleContext -> {
+//			ServiceRegistration<T> serviceRegistration =
+//				bundleContext.registerService(
+//					clazz, service, new Hashtable<>(properties));
+//
+//			PushStreamProvider pushStreamProvider =
+//				new PushStreamProvider();
+//
+//			SimplePushEventSource<ServiceRegistration<T>> addedSource =
+//				pushStreamProvider.createSimpleEventSource(null);
+//
+//			PushStream<ServiceRegistration<T>> added =
+//				pushStreamProvider.createStream(addedSource);
+//
+//			return new OSGiResult<>(
+//				added, pushStreamProvider.streamOf(Stream.empty()),
+//				x -> addedSource.publish(serviceRegistration),
+//				x -> {
+//					try {
+//						serviceRegistration.unregister();
+//					}
+//					catch (Exception e) {
+//					}
+//				});
+//		});
+//	}
 
 	public static <T> OSGiResult<T> runOsgi(
 		BundleContext bundleContext, OSGi<T> program) {
@@ -524,7 +518,6 @@ public class OSGi<T> {
 			}
 		};
 
-		osgiResult.added.onClose(() -> close.accept(null));
 		osgiResult.start.accept(null);
 
 		return new OSGiResult<>(
@@ -542,20 +535,22 @@ public class OSGi<T> {
 		}
 
 		public OSGi<T> once() {
-			return new OSGi<>(bundleContext -> {
-				AtomicReference<T> atomicReference = new AtomicReference<>(
-					null);
+//			return new OSGi<>(bundleContext -> {
+//				AtomicReference<T> atomicReference = new AtomicReference<>(
+//					null);
+//
+//				OSGiResult<T> osGiResult = this._operation.run(bundleContext);
+//
+//				return new OSGiResult<>(
+//					osGiResult.added.filter(
+//						t ->
+//							atomicReference.compareAndSet(null, t)),
+//					osGiResult.removed.filter(
+//						t -> atomicReference.get() == t),
+//					osGiResult.start, osGiResult.close);
+//			});
 
-				OSGiResult<T> osGiResult = this._operation.run(bundleContext);
-
-				return new OSGiResult<>(
-					osGiResult.added.filter(
-						t ->
-							atomicReference.compareAndSet(null, t)),
-					osGiResult.removed.filter(
-						t -> atomicReference.get() == t),
-					osGiResult.start, osGiResult.close);
-			});
+			return null;
 		}
 	}
 

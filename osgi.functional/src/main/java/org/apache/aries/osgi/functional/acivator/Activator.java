@@ -22,12 +22,9 @@ import org.osgi.service.cm.ManagedService;
 
 import java.util.HashMap;
 
-import static org.apache.aries.osgi.functional.OSGi.bundles;
 import static org.apache.aries.osgi.functional.OSGi.changeContext;
 import static org.apache.aries.osgi.functional.OSGi.close;
 import static org.apache.aries.osgi.functional.OSGi.just;
-import static org.apache.aries.osgi.functional.OSGi.prototypes;
-import static org.apache.aries.osgi.functional.OSGi.register;
 import static org.apache.aries.osgi.functional.OSGi.runOsgi;
 import static org.apache.aries.osgi.functional.OSGi.services;
 
@@ -59,12 +56,10 @@ public class Activator implements BundleActivator {
 	@Override
 	public void start(BundleContext bundleContext) throws Exception {
 		_result = runOsgi(bundleContext,
-			bundles(Bundle.ACTIVE).flatMap(b ->
-			changeContext(b.getBundleContext(),
 				services(org.osgi.service.cm.ManagedService.class).flatMap(ms ->
 				just(25).flatMap(a ->
-				register(Component.class, new Component(ms, a), new HashMap<>()))))
-		));
+				just(30).map(b -> {System.out.println("YAY! " + ms + " : " + a + b);return null;})
+		)));
 	}
 
 	@Override
