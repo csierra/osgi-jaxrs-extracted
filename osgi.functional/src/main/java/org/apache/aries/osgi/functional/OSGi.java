@@ -26,9 +26,6 @@ import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 import org.osgi.service.cm.ManagedServiceFactory;
-import org.osgi.util.pushstream.PushStream;
-import org.osgi.util.pushstream.PushStreamProvider;
-import org.osgi.util.pushstream.SimplePushEventSource;
 import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 import org.osgi.util.tracker.ServiceTracker;
@@ -42,7 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 /**
  * @author Carlos Sierra Andrés
@@ -62,31 +58,30 @@ public class OSGi<T> {
 		return new OSGi<>(((bundleContext) -> {
 			OSGiResult<T> osgiResult = _operation.run(bundleContext);
 
-			OSGiResult<S> osgiResult2 = (OSGiResult<S>) osgiResult;
-
-			osgiResult2.added = osgiResult.added.andThen(function);
-			osgiResult2.removed = osgiResult.removed.andThen(function);
-
-			return osgiResult2;
+			return new OSGiResult<>(
+				osgiResult.added.map(function),
+				osgiResult.removed.map(function),
+				osgiResult.start, osgiResult.close);
 		}));
 	}
 
 	public static <S> OSGi<S> just(S s) {
 		return new OSGi<>(((bundleContext) -> {
 
-			Function<Object, S> publish = x -> s;
+			Pipe<S, S> added = Pipe.create();
+			Consumer<S> source = added.getSource();
 
-			OSGiResult<S> osgiResult = new OSGiResult<>(
-				publish, a -> null, null, NOOP);
-
-			osgiResult.start = x -> ((Function)osgiResult.added).apply(s);
-
-			return osgiResult;
+			return new OSGiResult<>(
+				added, Pipe.create(), x -> source.accept(s), NOOP);
 		}));
 	}
 
-	public <S> OSGi<S> flatMap(Function<T, OSGi<S>> fun) {
+	public static <S> OSGi<S> nothing() {
+		return new OSGi<>(((bundleContext) -> new OSGiResult<>(
+			Pipe.create(), Pipe.create(), NOOP, NOOP)));
+	}
 
+	public <S> OSGi<S> flatMap(Function<T, OSGi<S>> fun) {
 		return new OSGi<>(
 			((bundleContext) -> {
 
@@ -95,10 +90,12 @@ public class OSGi<T> {
 				AtomicReference<Consumer<Void>> closeReference =
 					new AtomicReference<>(x -> {});
 
-				Function<Object, S> added = s -> (S)s;
+				Pipe<S, S> added = Pipe.create();
+
+				Consumer<S> addedSource = added.getSource();
 
 				OSGiResult<S> osgiResult = new OSGiResult<>(
-					added, x -> null, null,
+					added, Pipe.create(), null,
 					x -> {
 						synchronized (map) {
 							for (OSGiResult<S> result : map.values()) {
@@ -114,7 +111,7 @@ public class OSGi<T> {
 
 					closeReference.set(or1.close);
 
-					or1.added = or1.added.andThen(t -> {
+					or1.added.map(t -> {
 						OSGi<S> program = fun.apply(t);
 
 						OSGiResult<S> or2 = program._operation.run(
@@ -132,7 +129,7 @@ public class OSGi<T> {
 							}
 						};
 
-						or2.added.andThen(osgiResult.added::apply);
+						or2.added.map(r -> {addedSource.accept(r); return null;});
 //						or2.added.onClose(() -> close.accept(null));
 
 						or2.start.accept(null);
@@ -140,7 +137,7 @@ public class OSGi<T> {
 						return null;
 					});
 
-					or1.removed = or1.removed.andThen(t -> {
+					or1.removed.map(t -> {
 						synchronized (map) {
 							OSGiResult<S> osgiResult1 = map.remove(t);
 
@@ -168,196 +165,178 @@ public class OSGi<T> {
 		return this.flatMap(fun).map(x -> null);
 	}
 
-//	public static OSGi<Dictionary<String, ?>> configurations(
-//		String factoryPid) {
-//
-//		return new OSGi<>(bundleContext -> {
-//			PushStreamProvider pushStreamProvider =
-//				new PushStreamProvider();
-//
-//			SimplePushEventSource<Dictionary<String, ?>> addedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<Dictionary<String, ?>> added =
-//				pushStreamProvider.createStream(addedSource);
-//
-//			SimplePushEventSource<Dictionary<String, ?>> removedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<Dictionary<String, ?>> removed =
-//				pushStreamProvider.createStream(removedSource);
-//
-//			Map<String, Dictionary<String, ?>> results =
-//				new ConcurrentHashMap<>();
-//
-//			AtomicReference<ServiceRegistration<ManagedServiceFactory>>
-//				serviceRegistrationReference = new AtomicReference<>(null);
-//
-//			Consumer<Void> start = x ->
-//				serviceRegistrationReference.set(bundleContext.registerService(
-//					ManagedServiceFactory.class, new ManagedServiceFactory() {
-//						@Override
-//						public String getName() {
-//							return "Functional OSGi Managed Service Factory";
-//						}
-//
-//						@Override
-//						public void updated(
-//							String s, Dictionary<String, ?> dictionary)
-//							throws ConfigurationException {
-//
-//							results.put(s, dictionary);
-//
-//							addedSource.publish(dictionary);
-//						}
-//
-//						@Override
-//						public void deleted(String s) {
-//							Dictionary<String, ?> remove = results.remove(s);
-//
-//							removedSource.publish(remove);
-//
-//						}
-//					},
-//					new Hashtable<String, Object>() {{
-//						put("service.pid", factoryPid);
-//					}}));
-//
-//			return new OSGiResult<>(added, removed, start,
-//				x -> {
-//					serviceRegistrationReference.get().unregister();
-//
-//					for (Dictionary<String, ?> dictionary : results.values()) {
-//						removedSource.publish(dictionary);
-//					}
-//				});
-//		});
-//	}
+	public static OSGi<Dictionary<String, ?>> configurations(
+		String factoryPid) {
 
-//	public static OSGi<Dictionary<String, ?>> configuration(String pid) {
-//		return new OSGi<>(bundleContext -> {
-//			PushStreamProvider pushStreamProvider =
-//				new PushStreamProvider();
-//
-//			SimplePushEventSource<Dictionary<String, ?>> addedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<Dictionary<String, ?>> added =
-//				pushStreamProvider.createStream(addedSource);
-//
-//			SimplePushEventSource<Dictionary<String, ?>> removedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<Dictionary<String, ?>> removed =
-//				pushStreamProvider.createStream(removedSource);
-//
-//			AtomicReference<Dictionary<?, ?>> atomicReference =
-//				new AtomicReference<>(null);
-//
-//			AtomicReference<ServiceRegistration<ManagedService>>
-//				serviceRegistrationReferece = new AtomicReference<>(null);
-//
-//			Consumer<Void> start = x ->
-//				serviceRegistrationReferece.set(
-//					bundleContext.registerService(
-//						ManagedService.class,
-//						properties -> {
-//							if (properties == null) {
-//								addedSource.close();
-//							}
-//							else {
-//								if (atomicReference.compareAndSet(
-//									null, properties)) {
-//
-//									addedSource.publish(properties);
-//								}
-//								else {
-//									addedSource.close();
-//								}
-//							}
-//						},
-//						new Hashtable<String, Object>() {{
-//							put("service.pid", pid);
-//						}}));
-//
-//
-//			return new OSGiResult<>(
-//				added, removed, start,
-//				x -> serviceRegistrationReferece.get().unregister());
-//		});
-//	}
+		return new OSGi<>(bundleContext -> {
+			Map<String, Dictionary<String, ?>> results =
+				new ConcurrentHashMap<>();
 
-//	public static OSGi<Void> onClose(Consumer<Void> action) {
-//		PushStreamProvider pushStreamProvider = new PushStreamProvider();
-//
-//		return new OSGi<>(bundleContext -> new OSGiResult<>(
-//			pushStreamProvider.streamOf(Stream.empty()),
-//			pushStreamProvider.streamOf(Stream.empty()), NOOP, action::accept));
-//	}
+			AtomicReference<ServiceRegistration<ManagedServiceFactory>>
+				serviceRegistrationReference = new AtomicReference<>(null);
+
+			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> added =
+				Pipe.create();
+
+			Consumer<Dictionary<String, ?>> addedSource = added.getSource();
+
+			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> removed =
+				Pipe.create();
+
+			Consumer<Dictionary<String, ?>> removedSource = removed.getSource();
+
+			Consumer<Void> start = x ->
+				serviceRegistrationReference.set(bundleContext.registerService(
+					ManagedServiceFactory.class, new ManagedServiceFactory() {
+						@Override
+						public String getName() {
+							return "Functional OSGi Managed Service Factory";
+						}
+
+						@Override
+						public void updated(
+							String s, Dictionary<String, ?> dictionary)
+							throws ConfigurationException {
+
+							results.put(s, dictionary);
+
+							addedSource.accept(dictionary);
+						}
+
+						@Override
+						public void deleted(String s) {
+							Dictionary<String, ?> remove = results.remove(s);
+
+							removedSource.accept(remove);
+
+						}
+					},
+					new Hashtable<String, Object>() {{
+						put("service.pid", factoryPid);
+					}}));
+
+
+			return new OSGiResult<>(added, removed, start,
+				x -> {
+					serviceRegistrationReference.get().unregister();
+
+					for (Dictionary<String, ?> dictionary : results.values()) {
+						removedSource.accept(dictionary);
+					}
+				});
+		});
+	}
+
+	public static OSGi<Dictionary<String, ?>> configuration(String pid) {
+		return new OSGi<>(bundleContext -> {
+			AtomicReference<Dictionary<?, ?>> atomicReference =
+				new AtomicReference<>(null);
+
+			AtomicReference<ServiceRegistration<ManagedService>>
+				serviceRegistrationReferece = new AtomicReference<>(null);
+
+			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> added =
+				Pipe.create();
+
+			Consumer<Dictionary<String, ?>> addedSource = added.getSource();
+
+			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> removed =
+				Pipe.create();
+
+			Consumer<Dictionary<String, ?>> removedSource = removed.getSource();
+
+			Consumer<Void> start = x ->
+				serviceRegistrationReferece.set(
+					bundleContext.registerService(
+						ManagedService.class,
+						properties -> {
+							if (properties == null) {
+								removedSource.accept(null);
+							}
+							else {
+								if (atomicReference.compareAndSet(
+									null, properties)) {
+
+									addedSource.accept(properties);
+								}
+								else {
+									addedSource.accept(null);
+								}
+							}
+						},
+						new Hashtable<String, Object>() {{
+							put("service.pid", pid);
+						}}));
+
+			return new OSGiResult<>(
+				added, removed, start,
+				x -> serviceRegistrationReferece.get().unregister());
+		});
+	}
+
+	public static OSGi<Void> onClose(Consumer<Void> action) {
+		return new OSGi<>(bundleContext -> new OSGiResult<>(
+			Pipe.create(), Pipe.create(), NOOP, action::accept));
+	}
 
 	public static <T> MOSGi<T> services(Class<T> clazz) {
 		return services(clazz, null);
 	}
 
-//	public static <T> OSGi<ServiceReference<T>> serviceReferences(
-//		Class<T> clazz, String filterString) {
-//
-//		return new OSGi<>(bundleContext -> {
-//			PushStreamProvider pushStreamProvider =
-//				new PushStreamProvider();
-//
-//			SimplePushEventSource<ServiceReference<T>> addedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<ServiceReference<T>> added =
-//				pushStreamProvider.createStream(addedSource);
-//
-//			SimplePushEventSource<ServiceReference<T>> removedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<ServiceReference<T>> removed =
-//				pushStreamProvider.createStream(removedSource);
-//
-//			ServiceTracker<T, ServiceReference<T>> serviceTracker =
-//				new ServiceTracker<T, ServiceReference<T>>(
-//					bundleContext,
-//					buildFilter(bundleContext, filterString, clazz), null) {
-//
-//					@Override
-//					public ServiceReference<T> addingService(
-//						ServiceReference<T> reference) {
-//
-//						addedSource.publish(reference);
-//
-//						return reference;
-//					}
-//
-//					@Override
-//					public void removedService(
-//						ServiceReference<T> reference, ServiceReference<T> t) {
-//
-//						super.removedService(reference, t);
-//
-//						removedSource.publish(t);
-//					}
-//				};
-//
-//			return new OSGiResult<>(
-//				added, removed, x -> serviceTracker.open(),
-//				x -> serviceTracker.close());
-//
-//		});
-//	}
+	public static <T> OSGi<ServiceReference<T>> serviceReferences(
+		Class<T> clazz, String filterString) {
+
+		return new OSGi<>(bundleContext -> {
+			Pipe<ServiceReference<T>, ServiceReference<T>> added =
+				Pipe.create();
+
+			Consumer<ServiceReference<T>> addedSource = added.getSource();
+
+			Pipe<ServiceReference<T>, ServiceReference<T>> removed =
+				Pipe.create();
+
+			Consumer<ServiceReference<T>> removedSource = removed.getSource();
+
+			ServiceTracker<T, ServiceReference<T>> serviceTracker =
+				new ServiceTracker<T, ServiceReference<T>>(
+					bundleContext,
+					buildFilter(bundleContext, filterString, clazz), null) {
+
+					@Override
+					public ServiceReference<T> addingService(
+						ServiceReference<T> reference) {
+
+						addedSource.accept(reference);
+
+						return reference;
+					}
+
+					@Override
+					public void removedService(
+						ServiceReference<T> reference, ServiceReference<T> t) {
+
+						super.removedService(reference, t);
+
+						removedSource.accept(t);
+					}
+				};
+
+			return new OSGiResult<>(
+				added, removed, x -> serviceTracker.open(),
+				x -> serviceTracker.close());
+
+		});
+	}
 
 	public static <T> MOSGi<T> services(Class<T> clazz, String filterString) {
 		return new MOSGi<>(bundleContext -> {
+			Pipe<T, T> added = Pipe.create();
 
-			Function<Object, T> added = x -> (T)x;
+			Pipe<T, T> removed = Pipe.create();
 
-			Function<Object, T> removed = x -> (T)x;
+			Consumer<T> addedSource = added.getSource();
 
-			OSGiResult<T> osgiResult = new OSGiResult<>(
-				added, removed, null, null);
+			Consumer<T> removedSource = removed.getSource();
 
 			ServiceTracker<T, T> serviceTracker =
 				new ServiceTracker<T, T>(
@@ -373,7 +352,7 @@ public class OSGi<T> {
 
 						T t = super.addingService(reference);
 
-						osgiResult.added.apply(t);
+						addedSource.accept(t);
 
 						return t;
 					}
@@ -384,14 +363,13 @@ public class OSGi<T> {
 
 						super.removedService(reference, t);
 
-						osgiResult.removed.apply(t);
+						removedSource.accept(t);
 					}
 				};
 
-			osgiResult.start = x -> serviceTracker.open();
-			osgiResult.close = x -> serviceTracker.close();
-
-			return osgiResult;
+			return new OSGiResult<>(
+				added, removed, x -> serviceTracker.open(),
+				x -> serviceTracker.close());
 		});
 	}
 
@@ -401,56 +379,54 @@ public class OSGi<T> {
 		return new OSGi<>(b -> program._operation.run(bundleContext));
 	}
 
-//	public static MOSGi<Bundle> bundles(int stateMask) {
-//		return new MOSGi<>(bundleContext -> {
-//			PushStreamProvider pushStreamProvider =
-//				new PushStreamProvider();
-//
-//			SimplePushEventSource<Bundle> addedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<Bundle> added = pushStreamProvider.createStream(addedSource);
-//
-//			SimplePushEventSource<Bundle> removedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<Bundle> removed = pushStreamProvider.createStream(
-//				removedSource);
-//
-//			BundleTracker<Bundle> bundleTracker =
-//				new BundleTracker<>(
-//					bundleContext, stateMask,
-//					new BundleTrackerCustomizer<Bundle>() {
-//
-//					@Override
-//					public Bundle addingBundle(
-//						Bundle bundle, BundleEvent bundleEvent) {
-//
-//						addedSource.publish(bundle);
-//
-//						return bundle;
-//					}
-//
-//					@Override
-//					public void modifiedBundle(
-//						Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
-//
-//						removedBundle(bundle, bundleEvent, bundle2);
-//
-//						addingBundle(bundle, bundleEvent);
-//					}
-//
-//					@Override
-//					public void removedBundle(Bundle bundle, BundleEvent bundleEvent, Bundle bundle2) {
-//						removedSource.publish(bundle);
-//					}
-//				});
-//
-//			return new OSGiResult<>(
-//				added, removed, x -> bundleTracker.open(),
-//				x -> bundleTracker.close());
-//		});
-//	}
+	public static MOSGi<Bundle> bundles(int stateMask) {
+		return new MOSGi<>(bundleContext -> {
+			Pipe<Bundle, Bundle> added = Pipe.create();
+
+			Consumer<Bundle> addedSource = added.getSource();
+
+			Pipe<Bundle, Bundle> removed = Pipe.create();
+
+			Consumer<Bundle> removedSource = removed.getSource();
+
+			BundleTracker<Bundle> bundleTracker =
+				new BundleTracker<>(
+					bundleContext, stateMask,
+					new BundleTrackerCustomizer<Bundle>() {
+
+					@Override
+					public Bundle addingBundle(
+						Bundle bundle, BundleEvent bundleEvent) {
+
+						addedSource.accept(bundle);
+
+						return bundle;
+					}
+
+					@Override
+					public void modifiedBundle(
+						Bundle bundle, BundleEvent bundleEvent,
+						Bundle bundle2) {
+
+						removedBundle(bundle, bundleEvent, bundle2);
+
+						addingBundle(bundle, bundleEvent);
+					}
+
+					@Override
+					public void removedBundle(
+						Bundle bundle, BundleEvent bundleEvent,
+						Bundle bundle2) {
+
+						removedSource.accept(bundle);
+					}
+				});
+
+			return new OSGiResult<>(
+				added, removed, x -> bundleTracker.open(),
+				x -> bundleTracker.close());
+		});
+	}
 
 
 	private static <T> Filter buildFilter(
@@ -473,35 +449,31 @@ public class OSGi<T> {
 		return filter;
 	}
 
-//	public static <T, S extends T> OSGi<ServiceRegistration<T>> register(
-//		Class<T> clazz, S service, Map<String, Object> properties) {
-//
-//		return new OSGi<>(bundleContext -> {
-//			ServiceRegistration<T> serviceRegistration =
-//				bundleContext.registerService(
-//					clazz, service, new Hashtable<>(properties));
-//
-//			PushStreamProvider pushStreamProvider =
-//				new PushStreamProvider();
-//
-//			SimplePushEventSource<ServiceRegistration<T>> addedSource =
-//				pushStreamProvider.createSimpleEventSource(null);
-//
-//			PushStream<ServiceRegistration<T>> added =
-//				pushStreamProvider.createStream(addedSource);
-//
-//			return new OSGiResult<>(
-//				added, pushStreamProvider.streamOf(Stream.empty()),
-//				x -> addedSource.publish(serviceRegistration),
-//				x -> {
-//					try {
-//						serviceRegistration.unregister();
-//					}
-//					catch (Exception e) {
-//					}
-//				});
-//		});
-//	}
+	public static <T, S extends T> OSGi<ServiceRegistration<T>> register(
+		Class<T> clazz, S service, Map<String, Object> properties) {
+
+		return new OSGi<>(bundleContext -> {
+			ServiceRegistration<T> serviceRegistration =
+				bundleContext.registerService(
+					clazz, service, new Hashtable<>(properties));
+
+			Pipe<ServiceRegistration<T>, ServiceRegistration<T>> added =
+				Pipe.create();
+
+			Consumer<ServiceRegistration<T>> addedSource = added.getSource();
+
+			return new OSGiResult<>(
+				added, Pipe.create(),
+				x -> addedSource.accept(serviceRegistration),
+				x -> {
+					try {
+						serviceRegistration.unregister();
+					}
+					catch (Exception e) {
+					}
+				});
+		});
+	}
 
 	public static <T> OSGiResult<T> runOsgi(
 		BundleContext bundleContext, OSGi<T> program) {
@@ -535,22 +507,16 @@ public class OSGi<T> {
 		}
 
 		public OSGi<T> once() {
-//			return new OSGi<>(bundleContext -> {
-//				AtomicReference<T> atomicReference = new AtomicReference<>(
-//					null);
-//
-//				OSGiResult<T> osGiResult = this._operation.run(bundleContext);
-//
-//				return new OSGiResult<>(
-//					osGiResult.added.filter(
-//						t ->
-//							atomicReference.compareAndSet(null, t)),
-//					osGiResult.removed.filter(
-//						t -> atomicReference.get() == t),
-//					osGiResult.start, osGiResult.close);
-//			});
+			AtomicReference<T> atomicReference = new AtomicReference<>(null);
 
-			return null;
+			return flatMap(t -> {
+				if (atomicReference.compareAndSet(null, t)) {
+					return just(t);
+				}
+				else {
+					return nothing();
+				}
+			});
 		}
 	}
 

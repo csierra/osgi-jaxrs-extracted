@@ -14,48 +14,34 @@
 
 package org.apache.aries.osgi.functional;
 
-import org.osgi.framework.BundleContext;
-
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * @author Carlos Sierra Andrés
  */
-public interface OSGiOperation<T> {
+public class Pipe<I, O> {
 
-	OSGiResult<T> run(BundleContext bundleContext);
+	Function<I, O> pipe;
 
-	class OSGiResult<T> {
-		Pipe<?, T> added;
-		Pipe<?, T> removed;
-		Consumer<Void> start;
-		Consumer<Void> close;
-
-		OSGiResult(
-			Pipe<?, T> added, Pipe<?, T> removed,
-			Consumer<Void> start, Consumer<Void> close) {
-
-			this.added = added;
-			this.removed = removed;
-			this.start = start;
-			this.close = close;
-		}
+	private Pipe(Function<I, O> fun) {
+		this.pipe = fun;
 	}
 
-	public static class Tuple<T> {
-		public Object original;
-		public T t;
+	public <U> Pipe<I, U> map(Function<O, U> fun) {
+		this.pipe = (Function)this.pipe.andThen(fun);
 
-		public Tuple(Object original, T t) {
-			this.original = original;
-			this.t = t;
-		}
-
-		public <S> Tuple<S> map(Function<T, S> fun) {
-			return new Tuple<>(original, fun.apply(t));
-		}
-
+		return (Pipe<I, U>)this;
 	}
 
+	public Consumer<I> getSource() {
+		return i -> {
+			pipe.apply(i);
+		};
+	}
+
+	public static <T> Pipe<T, T> create() {
+		return new Pipe<>(x -> x);
+	}
 }
