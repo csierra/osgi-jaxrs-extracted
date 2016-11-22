@@ -348,7 +348,7 @@ public class OSGi<T> {
 	}
 
 	public static <T> MOSGi<T> services(Class<T> clazz, String filterString) {
-		return new MOSGi<>(bundleContext -> {
+		return new MOSGi<T>(bundleContext -> {
 			Pipe<Tuple<T>, Tuple<T>> added = Pipe.create();
 
 			Pipe<Tuple<T>, Tuple<T>> removed = Pipe.create();
@@ -401,7 +401,93 @@ public class OSGi<T> {
 			return new OSGiResult<>(
 				added, removed, x -> serviceTracker.open(),
 				x -> serviceTracker.close());
-		});
+		}) {
+			@Override
+			public <S> OSGi<S> flatMap(Function<T, OSGi<S>> fun) {
+				return new OSGi<>(bundleContext -> {
+					Pipe<Tuple<S>, Tuple<S>> added = Pipe.create();
+
+					Pipe<Tuple<S>, Tuple<S>> removed = Pipe.create();
+
+					Consumer<Tuple<S>> addedSource = added.getSource();
+
+					Consumer<Tuple<S>> removedSource = removed.getSource();
+
+					ServiceTracker<T, Tracked<T, S>> serviceTracker =
+						new ServiceTracker<>(
+							bundleContext,
+							buildFilter(bundleContext, filterString, clazz),
+							new ServiceTrackerCustomizer<T, Tracked<T, S>>() {
+								@Override
+								public Tracked<T, S> addingService(
+									ServiceReference<T> reference) {
+
+									ServiceObjects<T> serviceObjects =
+										bundleContext.getServiceObjects(
+											reference);
+
+									T service = serviceObjects.getService();
+
+									OSGi<S> program = fun.apply(service);
+
+									OSGiResult<S> result =
+										program._operation.run(bundleContext);
+
+									Tracked<T, S> tracked = new Tracked<>();
+
+									tracked.service = service;
+									tracked.program = result;
+
+									result.added.map(s -> {
+										tracked.result = s;
+
+										addedSource.accept(s);
+
+										return s;
+									});
+
+									result.start.accept(null);
+
+									return tracked;
+								}
+
+								@Override
+								public void modifiedService(
+									ServiceReference<T> reference,
+									Tracked<T, S> tracked) {
+
+									removedService(reference, tracked);
+
+									addingService(reference);
+								}
+
+								@Override
+								public void removedService(
+									ServiceReference<T> reference,
+									Tracked<T, S> tracked) {
+
+									close(tracked.program);
+
+									if (tracked.result != null) {
+										removedSource.accept(tracked.result);
+									}
+
+									ServiceObjects<T> serviceObjects =
+										bundleContext.getServiceObjects(
+											reference);
+
+									serviceObjects.ungetService(
+										tracked.service);
+								}
+							});
+
+					return new OSGiResult<>(
+						added, removed, x -> serviceTracker.open(),
+						x -> serviceTracker.close());
+
+				});
+			}
+		};
 	}
 
 	public static <T> OSGi<T> changeContext(
@@ -411,7 +497,7 @@ public class OSGi<T> {
 	}
 
 	public static MOSGi<Bundle> bundles(int stateMask) {
-		return new MOSGi<>(bundleContext -> {
+		return new MOSGi<Bundle>(bundleContext -> {
 			Pipe<Tuple<Bundle>, Tuple<Bundle>> added = Pipe.create();
 
 			Consumer<Tuple<Bundle>> addedSource = added.getSource();
@@ -458,12 +544,85 @@ public class OSGi<T> {
 			return new OSGiResult<>(
 				added, removed, x -> bundleTracker.open(),
 				x -> bundleTracker.close());
-		});
+		}) {
+			@Override
+			public <S> OSGi<S> flatMap(Function<Bundle, OSGi<S>> fun) {
+				return new OSGi<>(bundleContext -> {
+					Pipe<Tuple<S>, Tuple<S>> added = Pipe.create();
+
+					Consumer<Tuple<S>> addedSource = added.getSource();
+
+					Pipe<Tuple<S>, Tuple<S>> removed = Pipe.create();
+
+					Consumer<Tuple<S>> removedSource = removed.getSource();
+
+					BundleTracker<Tracked<Bundle, S>> bundleTracker =
+						new BundleTracker<>(
+							bundleContext, stateMask,
+							new BundleTrackerCustomizer<Tracked<Bundle, S>>() {
+
+								@Override
+								public Tracked<Bundle, S> addingBundle(
+									Bundle bundle, BundleEvent bundleEvent) {
+
+									OSGi<S> program = fun.apply(bundle);
+
+									OSGiResult<S> result =
+										program._operation.run(bundleContext);
+
+									Tracked<Bundle, S> tracked = new Tracked<>();
+
+									tracked.service = bundle;
+									tracked.program = result;
+
+									result.added.map(s -> {
+										tracked.result = s;
+
+										addedSource.accept(s);
+
+										return s;
+									});
+
+									result.start.accept(null);
+
+									return tracked;
+								}
+
+								@Override
+								public void modifiedBundle(
+									Bundle bundle, BundleEvent bundleEvent,
+									Tracked<Bundle, S> tracked) {
+
+									removedBundle(bundle, bundleEvent, tracked);
+
+									addingBundle(bundle, bundleEvent);
+								}
+
+								@Override
+								public void removedBundle(
+									Bundle bundle, BundleEvent bundleEvent,
+									Tracked<Bundle, S> tracked) {
+
+									close(tracked.program);
+
+									if (tracked.result != null) {
+										removedSource.accept(tracked.result);
+									}
+								}
+							});
+
+					return new OSGiResult<>(
+						added, removed, x -> bundleTracker.open(),
+						x -> bundleTracker.close());
+
+				});
+			}
+		};
 	}
 
 
-	private static <T> Filter buildFilter(
-		BundleContext bundleContext, String filterString, Class<T> clazz) {
+	private static Filter buildFilter(
+		BundleContext bundleContext, String filterString, Class<?> clazz) {
 		Filter filter;
 		try {
 			if (filterString == null) {
@@ -557,6 +716,13 @@ public class OSGi<T> {
 		}
 	}
 
+	private static class Tracked<T, S> {
+		T service = null;
+
+		OSGiResult<S> program = null;
+
+		Tuple<S> result = null;
+	}
 }
 
 

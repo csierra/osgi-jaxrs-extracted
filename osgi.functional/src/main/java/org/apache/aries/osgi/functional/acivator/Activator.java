@@ -59,25 +59,22 @@ public class Activator implements BundleActivator {
 
 	@Override
 	public void start(BundleContext bundleContext) throws Exception {
-		OSGi<Component> program =
+
+		_result = runOsgi(
+			bundleContext,
 			bundles(Bundle.ACTIVE).map(Bundle::getBundleContext).flatMap(bc ->
 			changeContext(bc,
 				onClose(() -> System.out.println("BC " + bc + " is gone")).then(
 				services(ManagedService.class).flatMap(ms ->
 				just(25).flatMap(a ->
-				just(30).map(b -> {
+				just(30).flatMap(b -> {
 					System.out.println("YAY! " + ms + " : " + a + b);
 
-					return new Component(ms, a + b);
+					return register(
+						Component.class, new Component(ms, a + b),
+						new HashMap<>());
 				})
-				))
-			)));
-
-		_result = runOsgi(bundleContext, program.flatMap(c -> {
-			System.out.println("COMPONENT: " + c);
-
-			return register(Component.class, c, new HashMap<>());
-		}));
+			))))));
 	}
 
 	@Override
