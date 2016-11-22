@@ -16,32 +16,38 @@ package org.apache.aries.osgi.functional;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * @author Carlos Sierra Andrés
  */
-public class Pipe<I, O> {
+class Pipe<I, O> {
 
 	Function<I, O> pipe;
+	private Runnable _closeHandler = () -> {};
 
 	private Pipe(Function<I, O> fun) {
 		this.pipe = fun;
 	}
 
-	public <U> Pipe<I, U> map(Function<O, U> fun) {
+	static <T> Pipe<T, T> create() {
+		return new Pipe<>(x -> x);
+	}
+
+	Consumer<I> getSource() {
+		return i -> pipe.apply(i);
+	}
+
+	<U> Pipe<I, U> map(Function<O, U> fun) {
 		this.pipe = (Function)this.pipe.andThen(fun);
 
 		return (Pipe<I, U>)this;
 	}
 
-	public Consumer<I> getSource() {
-		return i -> {
-			pipe.apply(i);
-		};
+	void onClose(Runnable closeHandler) {
+		_closeHandler = closeHandler;
 	}
 
-	public static <T> Pipe<T, T> create() {
-		return new Pipe<>(x -> x);
+	void close() {
+		_closeHandler.run();
 	}
 }

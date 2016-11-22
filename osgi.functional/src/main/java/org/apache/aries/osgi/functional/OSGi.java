@@ -15,6 +15,7 @@
 package org.apache.aries.osgi.functional;
 
 import org.apache.aries.osgi.functional.OSGiOperation.OSGiResult;
+import org.apache.aries.osgi.functional.OSGiOperation.Tuple;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
@@ -29,6 +30,7 @@ import org.osgi.service.cm.ManagedServiceFactory;
 import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 import org.osgi.util.tracker.ServiceTracker;
+import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
 import java.util.Dictionary;
 import java.util.Hashtable;
@@ -59,8 +61,8 @@ public class OSGi<T> {
 			OSGiResult<T> osgiResult = _operation.run(bundleContext);
 
 			return new OSGiResult<>(
-				osgiResult.added.map(function),
-				osgiResult.removed.map(function),
+				osgiResult.added.map(t -> t.map(function)),
+				osgiResult.removed.map(t -> t.map(function)),
 				osgiResult.start, osgiResult.close);
 		}));
 	}
@@ -68,11 +70,12 @@ public class OSGi<T> {
 	public static <S> OSGi<S> just(S s) {
 		return new OSGi<>(((bundleContext) -> {
 
-			Pipe<S, S> added = Pipe.create();
-			Consumer<S> source = added.getSource();
+			Pipe<Tuple<S>, Tuple<S>> added = Pipe.create();
+			Consumer<Tuple<S>> source = added.getSource();
 
 			return new OSGiResult<>(
-				added, Pipe.create(), x -> source.accept(s), NOOP);
+				added, Pipe.create(),
+				x -> source.accept(Tuple.create(s)), NOOP);
 		}));
 	}
 
@@ -85,20 +88,20 @@ public class OSGi<T> {
 		return new OSGi<>(
 			((bundleContext) -> {
 
-				Map<T, OSGiResult<S>> map = new IdentityHashMap<>();
+				Map<Object, OSGiResult<S>> identities = new IdentityHashMap<>();
 
 				AtomicReference<Consumer<Void>> closeReference =
 					new AtomicReference<>(x -> {});
 
-				Pipe<S, S> added = Pipe.create();
+				Pipe<Tuple<S>, Tuple<S>> added = Pipe.create();
 
-				Consumer<S> addedSource = added.getSource();
+				Consumer<Tuple<S>> addedSource = added.getSource();
 
 				OSGiResult<S> osgiResult = new OSGiResult<>(
 					added, Pipe.create(), null,
 					x -> {
-						synchronized (map) {
-							for (OSGiResult<S> result : map.values()) {
+						synchronized (identities) {
+							for (OSGiResult<S> result : identities.values()) {
 								close(result);
 							}
 						}
@@ -112,16 +115,17 @@ public class OSGi<T> {
 					closeReference.set(or1.close);
 
 					or1.added.map(t -> {
-						OSGi<S> program = fun.apply(t);
+						OSGi<S> program = fun.apply(t.t);
 
 						OSGiResult<S> or2 = program._operation.run(
 							bundleContext);
 
-						map.put(t, or2);
+						identities.put(t.original, or2);
 
 						Consumer<Boolean> close = x -> {
-							synchronized (map) {
-								OSGiResult<S> closer = map.remove(t);
+							synchronized (identities) {
+								OSGiResult<S> closer = identities.remove(
+									t.original);
 
 								if (closer != null) {
 									OSGi.close(closer);
@@ -130,7 +134,7 @@ public class OSGi<T> {
 						};
 
 						or2.added.map(r -> {addedSource.accept(r); return null;});
-//						or2.added.onClose(() -> close.accept(null));
+						or2.added.onClose(() -> close.accept(null));
 
 						or2.start.accept(null);
 
@@ -138,8 +142,9 @@ public class OSGi<T> {
 					});
 
 					or1.removed.map(t -> {
-						synchronized (map) {
-							OSGiResult<S> osgiResult1 = map.remove(t);
+						synchronized (identities) {
+							OSGiResult<S> osgiResult1 = identities.remove(
+								t.original);
 
 							if (osgiResult1 != null) {
 								OSGi.close(osgiResult1);
@@ -169,21 +174,23 @@ public class OSGi<T> {
 		String factoryPid) {
 
 		return new OSGi<>(bundleContext -> {
-			Map<String, Dictionary<String, ?>> results =
+			Map<String, Tuple<Dictionary<String, ?>>> results =
 				new ConcurrentHashMap<>();
 
 			AtomicReference<ServiceRegistration<ManagedServiceFactory>>
 				serviceRegistrationReference = new AtomicReference<>(null);
 
-			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> added =
-				Pipe.create();
+			Pipe<Tuple<Dictionary<String, ?>>, Tuple<Dictionary<String, ?>>>
+				added = Pipe.create();
 
-			Consumer<Dictionary<String, ?>> addedSource = added.getSource();
+			Consumer<Tuple<Dictionary<String, ?>>> addedSource =
+				added.getSource();
 
-			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> removed =
-				Pipe.create();
+			Pipe<Tuple<Dictionary<String, ?>>, Tuple<Dictionary<String, ?>>>
+				removed = Pipe.create();
 
-			Consumer<Dictionary<String, ?>> removedSource = removed.getSource();
+			Consumer<Tuple<Dictionary<String, ?>>> removedSource =
+				removed.getSource();
 
 			Consumer<Void> start = x ->
 				serviceRegistrationReference.set(bundleContext.registerService(
@@ -198,17 +205,20 @@ public class OSGi<T> {
 							String s, Dictionary<String, ?> dictionary)
 							throws ConfigurationException {
 
-							results.put(s, dictionary);
+							Tuple<Dictionary<String, ?>> tuple = Tuple.create(
+								dictionary);
 
-							addedSource.accept(dictionary);
+							results.put(s, tuple);
+
+							addedSource.accept(tuple);
 						}
 
 						@Override
 						public void deleted(String s) {
-							Dictionary<String, ?> remove = results.remove(s);
+							Tuple<Dictionary<String, ?>> tuple =
+								results.remove(s);
 
-							removedSource.accept(remove);
-
+							removedSource.accept(tuple);
 						}
 					},
 					new Hashtable<String, Object>() {{
@@ -220,8 +230,8 @@ public class OSGi<T> {
 				x -> {
 					serviceRegistrationReference.get().unregister();
 
-					for (Dictionary<String, ?> dictionary : results.values()) {
-						removedSource.accept(dictionary);
+					for (Tuple<Dictionary<String, ?>> tuple : results.values()) {
+						removedSource.accept(tuple);
 					}
 				});
 		});
@@ -235,15 +245,14 @@ public class OSGi<T> {
 			AtomicReference<ServiceRegistration<ManagedService>>
 				serviceRegistrationReferece = new AtomicReference<>(null);
 
-			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> added =
-				Pipe.create();
+			Pipe<Tuple<Dictionary<String, ?>>, Tuple<Dictionary<String, ?>>>
+				added = Pipe.create();
 
-			Consumer<Dictionary<String, ?>> addedSource = added.getSource();
+			Consumer<Tuple<Dictionary<String, ?>>> addedSource =
+				added.getSource();
 
-			Pipe<Dictionary<String, ?>, Dictionary<String, ?>> removed =
-				Pipe.create();
-
-			Consumer<Dictionary<String, ?>> removedSource = removed.getSource();
+			Pipe<Tuple<Dictionary<String, ?>>, Tuple<Dictionary<String, ?>>>
+				removed = Pipe.create();
 
 			Consumer<Void> start = x ->
 				serviceRegistrationReferece.set(
@@ -251,16 +260,16 @@ public class OSGi<T> {
 						ManagedService.class,
 						properties -> {
 							if (properties == null) {
-								removedSource.accept(null);
+								added.close();
 							}
 							else {
 								if (atomicReference.compareAndSet(
 									null, properties)) {
 
-									addedSource.accept(properties);
+									addedSource.accept(Tuple.create(properties));
 								}
 								else {
-									addedSource.accept(null);
+									added.close();
 								}
 							}
 						},
@@ -274,9 +283,16 @@ public class OSGi<T> {
 		});
 	}
 
-	public static OSGi<Void> onClose(Consumer<Void> action) {
-		return new OSGi<>(bundleContext -> new OSGiResult<>(
-			Pipe.create(), Pipe.create(), NOOP, action::accept));
+	public static OSGi<Void> onClose(Runnable action) {
+		return
+			new OSGi<>(bundleContext -> {
+				Pipe<Tuple<Void>, Tuple<Void>> pipe = Pipe.create();
+
+				return new OSGiResult<>(
+					pipe, Pipe.create(),
+					x -> pipe.getSource().accept(Tuple.create(null)),
+					x -> action.run());
+			});
 	}
 
 	public static <T> MOSGi<T> services(Class<T> clazz) {
@@ -287,33 +303,36 @@ public class OSGi<T> {
 		Class<T> clazz, String filterString) {
 
 		return new OSGi<>(bundleContext -> {
-			Pipe<ServiceReference<T>, ServiceReference<T>> added =
+			Pipe<Tuple<ServiceReference<T>>, Tuple<ServiceReference<T>>> added =
 				Pipe.create();
 
-			Consumer<ServiceReference<T>> addedSource = added.getSource();
+			Consumer<Tuple<ServiceReference<T>>> addedSource = added.getSource();
 
-			Pipe<ServiceReference<T>, ServiceReference<T>> removed =
+			Pipe<Tuple<ServiceReference<T>>, Tuple<ServiceReference<T>>> removed =
 				Pipe.create();
 
-			Consumer<ServiceReference<T>> removedSource = removed.getSource();
+			Consumer<Tuple<ServiceReference<T>>> removedSource = removed.getSource();
 
-			ServiceTracker<T, ServiceReference<T>> serviceTracker =
-				new ServiceTracker<T, ServiceReference<T>>(
+			ServiceTracker<T, Tuple<ServiceReference<T>>> serviceTracker =
+				new ServiceTracker<T, Tuple<ServiceReference<T>>>(
 					bundleContext,
 					buildFilter(bundleContext, filterString, clazz), null) {
 
 					@Override
-					public ServiceReference<T> addingService(
+					public Tuple<ServiceReference<T>> addingService(
 						ServiceReference<T> reference) {
 
-						addedSource.accept(reference);
+						Tuple<ServiceReference<T>> tuple = Tuple.create(reference);
 
-						return reference;
+						addedSource.accept(tuple);
+
+						return tuple;
 					}
 
 					@Override
 					public void removedService(
-						ServiceReference<T> reference, ServiceReference<T> t) {
+						ServiceReference<T> reference,
+						Tuple<ServiceReference<T>> t) {
 
 						super.removedService(reference, t);
 
@@ -330,42 +349,54 @@ public class OSGi<T> {
 
 	public static <T> MOSGi<T> services(Class<T> clazz, String filterString) {
 		return new MOSGi<>(bundleContext -> {
-			Pipe<T, T> added = Pipe.create();
+			Pipe<Tuple<T>, Tuple<T>> added = Pipe.create();
 
-			Pipe<T, T> removed = Pipe.create();
+			Pipe<Tuple<T>, Tuple<T>> removed = Pipe.create();
 
-			Consumer<T> addedSource = added.getSource();
+			Consumer<Tuple<T>> addedSource = added.getSource();
 
-			Consumer<T> removedSource = removed.getSource();
+			Consumer<Tuple<T>> removedSource = removed.getSource();
 
-			ServiceTracker<T, T> serviceTracker =
-				new ServiceTracker<T, T>(
+			ServiceTracker<T, Tuple<T>> serviceTracker =
+				new ServiceTracker<>(
 					bundleContext,
-					buildFilter(bundleContext, filterString, clazz), null) {
+					buildFilter(bundleContext, filterString, clazz),
+					new ServiceTrackerCustomizer<T, Tuple<T>>() {
+						@Override
+						public Tuple<T> addingService(ServiceReference<T> reference) {
+							ServiceObjects<T> serviceObjects =
+								bundleContext.getServiceObjects(reference);
 
-					@Override
-					public T addingService(ServiceReference<T> reference) {
-						ServiceObjects<T> serviceObjects =
-							bundleContext.getServiceObjects(reference);
+							T service = serviceObjects.getService();
 
-						serviceObjects.getService();
+							Tuple<T> tuple = Tuple.create(service);
 
-						T t = super.addingService(reference);
+							addedSource.accept(tuple);
 
-						addedSource.accept(t);
+							return tuple;
+						}
 
-						return t;
-					}
+						@Override
+						public void modifiedService(
+							ServiceReference<T> reference, Tuple<T> service) {
 
-					@Override
-					public void removedService(
-						ServiceReference<T> reference, T t) {
+							removedService(reference, service);
 
-						super.removedService(reference, t);
+							addingService(reference);
+						}
 
-						removedSource.accept(t);
-					}
-				};
+						@Override
+						public void removedService(
+							ServiceReference<T> reference, Tuple<T> tuple) {
+
+							ServiceObjects<T> serviceObjects =
+								bundleContext.getServiceObjects(reference);
+
+							removedSource.accept(tuple);
+
+							serviceObjects.ungetService(tuple.t);
+						}
+					});
 
 			return new OSGiResult<>(
 				added, removed, x -> serviceTracker.open(),
@@ -381,34 +412,36 @@ public class OSGi<T> {
 
 	public static MOSGi<Bundle> bundles(int stateMask) {
 		return new MOSGi<>(bundleContext -> {
-			Pipe<Bundle, Bundle> added = Pipe.create();
+			Pipe<Tuple<Bundle>, Tuple<Bundle>> added = Pipe.create();
 
-			Consumer<Bundle> addedSource = added.getSource();
+			Consumer<Tuple<Bundle>> addedSource = added.getSource();
 
-			Pipe<Bundle, Bundle> removed = Pipe.create();
+			Pipe<Tuple<Bundle>, Tuple<Bundle>> removed = Pipe.create();
 
-			Consumer<Bundle> removedSource = removed.getSource();
+			Consumer<Tuple<Bundle>> removedSource = removed.getSource();
 
-			BundleTracker<Bundle> bundleTracker =
+			BundleTracker<Tuple<Bundle>> bundleTracker =
 				new BundleTracker<>(
 					bundleContext, stateMask,
-					new BundleTrackerCustomizer<Bundle>() {
+					new BundleTrackerCustomizer<Tuple<Bundle>>() {
 
 					@Override
-					public Bundle addingBundle(
+					public Tuple<Bundle> addingBundle(
 						Bundle bundle, BundleEvent bundleEvent) {
 
-						addedSource.accept(bundle);
+						Tuple<Bundle> tuple = Tuple.create(bundle);
 
-						return bundle;
+						addedSource.accept(tuple);
+
+						return tuple;
 					}
 
 					@Override
 					public void modifiedBundle(
 						Bundle bundle, BundleEvent bundleEvent,
-						Bundle bundle2) {
+						Tuple<Bundle> tuple) {
 
-						removedBundle(bundle, bundleEvent, bundle2);
+						removedBundle(bundle, bundleEvent, tuple);
 
 						addingBundle(bundle, bundleEvent);
 					}
@@ -416,9 +449,9 @@ public class OSGi<T> {
 					@Override
 					public void removedBundle(
 						Bundle bundle, BundleEvent bundleEvent,
-						Bundle bundle2) {
+						Tuple<Bundle> tuple) {
 
-						removedSource.accept(bundle);
+						removedSource.accept(tuple);
 					}
 				});
 
@@ -457,14 +490,18 @@ public class OSGi<T> {
 				bundleContext.registerService(
 					clazz, service, new Hashtable<>(properties));
 
-			Pipe<ServiceRegistration<T>, ServiceRegistration<T>> added =
-				Pipe.create();
+			Pipe<Tuple<ServiceRegistration<T>>, Tuple<ServiceRegistration<T>>>
+				added = Pipe.create();
 
-			Consumer<ServiceRegistration<T>> addedSource = added.getSource();
+			Consumer<Tuple<ServiceRegistration<T>>> addedSource =
+				added.getSource();
+
+			Tuple<ServiceRegistration<T>> tuple = Tuple.create(
+				serviceRegistration);
 
 			return new OSGiResult<>(
 				added, Pipe.create(),
-				x -> addedSource.accept(serviceRegistration),
+				x -> addedSource.accept(tuple),
 				x -> {
 					try {
 						serviceRegistration.unregister();

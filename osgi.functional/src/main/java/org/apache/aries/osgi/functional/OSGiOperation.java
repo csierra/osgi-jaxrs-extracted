@@ -27,13 +27,13 @@ public interface OSGiOperation<T> {
 	OSGiResult<T> run(BundleContext bundleContext);
 
 	class OSGiResult<T> {
-		Pipe<?, T> added;
-		Pipe<?, T> removed;
+		Pipe<?, Tuple<T>> added;
+		Pipe<?, Tuple<T>> removed;
 		Consumer<Void> start;
 		Consumer<Void> close;
 
 		OSGiResult(
-			Pipe<?, T> added, Pipe<?, T> removed,
+			Pipe<?, Tuple<T>> added, Pipe<?, Tuple<T>> removed,
 			Consumer<Void> start, Consumer<Void> close) {
 
 			this.added = added;
@@ -43,17 +43,21 @@ public interface OSGiOperation<T> {
 		}
 	}
 
-	public static class Tuple<T> {
-		public Object original;
-		public T t;
+	class Tuple<T> {
+		Object original;
+		T t;
 
-		public Tuple(Object original, T t) {
+		private Tuple(Object original, T t) {
 			this.original = original;
 			this.t = t;
 		}
 
 		public <S> Tuple<S> map(Function<T, S> fun) {
 			return new Tuple<>(original, fun.apply(t));
+		}
+
+		static <T> Tuple<T> create(T t) {
+			return new Tuple<>(t, t);
 		}
 
 	}
