@@ -14,7 +14,6 @@
 
 package org.apache.aries.osgi.functional.acivator;
 
-import org.apache.aries.osgi.functional.OSGi;
 import org.apache.aries.osgi.functional.OSGiOperation.OSGiResult;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
@@ -28,6 +27,7 @@ import static org.apache.aries.osgi.functional.OSGi.changeContext;
 import static org.apache.aries.osgi.functional.OSGi.close;
 import static org.apache.aries.osgi.functional.OSGi.just;
 import static org.apache.aries.osgi.functional.OSGi.onClose;
+import static org.apache.aries.osgi.functional.OSGi.prototypes;
 import static org.apache.aries.osgi.functional.OSGi.register;
 import static org.apache.aries.osgi.functional.OSGi.runOsgi;
 import static org.apache.aries.osgi.functional.OSGi.services;
@@ -64,17 +64,15 @@ public class Activator implements BundleActivator {
 			bundleContext,
 			bundles(Bundle.ACTIVE).map(Bundle::getBundleContext).flatMap(bc ->
 			changeContext(bc,
-				onClose(() -> System.out.println("BC " + bc + " is gone")).then(
-				services(ManagedService.class).flatMap(ms ->
+				prototypes(ManagedService.class).flatMap(prot ->
 				just(25).flatMap(a ->
-				just(30).flatMap(b -> {
-					System.out.println("YAY! " + ms + " : " + a + b);
-
-					return register(
-						Component.class, new Component(ms, a + b),
-						new HashMap<>());
-				})
-			))))));
+				just(30).flatMap(b ->
+				just(prot.getService()).flatMap(ms ->
+				just(new Component(ms, a + b)).flatMap(comp ->
+				register(Component.class, comp, new HashMap<>()).then(
+				onClose(() -> prot.ungetService(ms))
+				))))))
+			)));
 	}
 
 	@Override
